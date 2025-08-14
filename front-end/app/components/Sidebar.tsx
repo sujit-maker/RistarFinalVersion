@@ -361,6 +361,10 @@ export default function SidebarWithHeader({
                 );
               }
 
+                if (item.label === "Users" && userType?.toUpperCase() !== "SUPERADMIN") {
+    return null; // hide for others
+  }
+
               // Special case: Users only for superadmin
               if (item.label === "Users") {
                 if (userType !== "superadmin") return null;
