@@ -30,6 +30,8 @@ export default function UsersPermissionsPage() {
   const [permissions, setPermissions] = useState<any[]>([]);
   const [loadingPermissions, setLoadingPermissions] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false); // ✅ State for modal
+  const [editUser, setEditUser] = useState<any>(null);
+
   // Fetch users
   useEffect(() => {
     fetch("http://localhost:8000/users")
@@ -114,6 +116,7 @@ export default function UsersPermissionsPage() {
                 <th className="p-2 border">Username</th>
                 <th className="p-2 border">Full Name</th>
                 <th className="p-2 border">Department</th>
+                <th className="p-2 border text-center">Edit</th>
                 <th className="p-2 border text-center">Manage Permissions</th>
               </tr>
             </thead>
@@ -127,6 +130,18 @@ export default function UsersPermissionsPage() {
                     <Button
                       size="icon"
                       variant="ghost"
+                      onClick={() => {
+                        setEditUser(u);
+                        setShowAddModal(true);
+                      }}
+                    >
+                      ✏️
+                    </Button>
+                  </td>
+                  <td className="p-2 border text-center">
+                    <Button
+                      size="icon"
+                      variant="ghost"
                       onClick={() => openPermissionsModal(u)}
                     >
                       <Settings size={18} />
@@ -136,6 +151,7 @@ export default function UsersPermissionsPage() {
               ))}
             </tbody>
           </table>
+
         </div>
       </div>
 
@@ -166,7 +182,6 @@ export default function UsersPermissionsPage() {
                     <tbody>
                       {permissions.map((perm, idx) => {
                         const allSelected = perm.canRead && perm.canCreate && perm.canEdit && perm.canDelete;
-
                         return (
                           <tr key={perm.module} className="hover:bg-gray-50 dark:hover:bg-neutral-800">
                             <td className="p-2 border font-medium">{perm.module}</td>
@@ -176,15 +191,17 @@ export default function UsersPermissionsPage() {
                                 checked={allSelected}
                                 onChange={(e) => {
                                   const newValue = e.target.checked;
-                                  setPermissions(prev =>
+                                  setPermissions((prev) =>
                                     prev.map((p, i) =>
-                                      i === idx ? {
-                                        ...p,
-                                        canRead: newValue,
-                                        canCreate: newValue,
-                                        canEdit: newValue,
-                                        canDelete: newValue
-                                      } : p
+                                      i === idx
+                                        ? {
+                                          ...p,
+                                          canRead: newValue,
+                                          canCreate: newValue,
+                                          canEdit: newValue,
+                                          canDelete: newValue
+                                        }
+                                        : p
                                     )
                                   );
                                 }}
@@ -205,8 +222,8 @@ export default function UsersPermissionsPage() {
                         );
                       })}
                     </tbody>
-
                   </table>
+
                 </div>
               </div>
             )}
@@ -224,9 +241,14 @@ export default function UsersPermissionsPage() {
       )}
       <AddUserModal
         isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
+        onClose={() => {
+          setShowAddModal(false);
+          setEditUser(null); // reset after closing
+        }}
         onUserAdded={fetchUsers}
+        editUser={editUser} // ✅ pass selected user
       />
+
     </div>
   );
 }
