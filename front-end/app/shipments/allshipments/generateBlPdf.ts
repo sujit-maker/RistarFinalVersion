@@ -436,77 +436,83 @@ export async function generateBlPdf(
     const termsWrapped = doc.splitTextToSize(termsBlock.join(' '), rightMaxWidth);
     
     // Calculate available space and limit text if needed
-    const availableSpace = maxRightTermsY - (ry + 10);
-    const maxTermsLines = Math.floor(availableSpace / 3.2);
-    const displayedTerms = termsWrapped.slice(0, maxTermsLines);
-    
-    doc.text(displayedTerms, rightX, ry + 10);
-    const rightBottomY = ry + displayedTerms.length * 3.2;
-  
-    // Determine header height dynamically
-    const contentBottomY = Math.max(leftBottomY, rightBottomY);
-    const portsTop = contentBottomY + 2; // Reduced from 4 to 2 to shift content up
-    const rowH = 10; // Reduced from 12 to 10 to save space
-    const portsHeight = rowH * 4; // four stacked rows on left
-    const totalHeaderHeight = (portsTop - headerTop) + portsHeight + 2;
+const availableSpace = maxRightTermsY - (ry + 10);
+const maxTermsLines = Math.floor(availableSpace / 3.2);
+const displayedTerms = termsWrapped.slice(0, maxTermsLines);
 
-    // Draw header box (omit top edge so only the outer border top line is visible)
-    doc.setLineWidth(0.5);
-    // left edge
-    doc.line(headerLeft, headerTop, headerLeft, headerTop + totalHeaderHeight);
-    // bottom edge
-    doc.line(headerLeft, headerTop + totalHeaderHeight, headerLeft + headerWidth, headerTop + totalHeaderHeight);
-    // right edge
-    doc.line(headerLeft + headerWidth, headerTop, headerLeft + headerWidth, headerTop + totalHeaderHeight);
-    doc.line(headerSplitX, headerTop, headerSplitX, headerTop + totalHeaderHeight);
-    // Separator above ports grid (left panel only)
-    doc.line(headerLeft, portsTop, headerSplitX, portsTop);
+doc.text(displayedTerms, rightX, ry + 10);
+const rightBottomY = ry + displayedTerms.length * 3.2;
 
-    // Ports labels/values stacked on left; only Port Of Discharge on right row 1
-    doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    const pLeftX = headerLeft + 5;
-    const innerSplitX = headerLeft + Math.floor((headerSplitX - headerLeft) / 2);
-    const pMidX = innerSplitX + 5; // right side of the left panel
-    // Row 1 label/value
-    doc.text('Place Of Acceptance', pLeftX, portsTop + 4);
-    doc.setFontSize(10);
-    doc.setFont('arial', 'normal');
-    // Value with generous gap from label and safe distance from bottom rule
-    doc.text(polName || '', pLeftX, portsTop + 9);
-    doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    doc.text('Port Of Discharge', pMidX, portsTop + 4);
-    doc.setFontSize(10);
-    doc.setFont('arial', 'normal');
-    doc.text(podName || '', pMidX, portsTop + 9);
-    // underline row 1 (only left panel)
-    doc.line(headerLeft, portsTop + rowH, headerSplitX, portsTop + rowH);
+// Determine header height dynamically
+const contentBottomY = Math.max(leftBottomY, rightBottomY);
+const portsTop = contentBottomY + 2; // Reduced from 4 to 2 to shift content up
+const rowH = 10; // Reduced from 12 to 10 to save space
+const portsHeight = rowH * 4; // four stacked rows on left
+const totalHeaderHeight = (portsTop - headerTop) + portsHeight + 2;
 
-    // Row 2
-    doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    doc.text('Port Of Loading', pLeftX, portsTop + rowH + 4);
-    doc.setFontSize(10);
-    doc.setFont('arial', 'normal');
-    doc.text(polName || '', pLeftX, portsTop + rowH + 9);
-    doc.line(headerLeft, portsTop + rowH * 2, headerSplitX, portsTop + rowH * 2);
+// Draw header box (omit top edge so only the outer border top line is visible)
+doc.setLineWidth(0.5);
+// left edge
+doc.line(headerLeft, headerTop, headerLeft, headerTop + totalHeaderHeight);
+// bottom edge
+doc.line(headerLeft, headerTop + totalHeaderHeight, headerLeft + headerWidth, headerTop + totalHeaderHeight);
+// right edge
+doc.line(headerLeft + headerWidth, headerTop, headerLeft + headerWidth, headerTop + totalHeaderHeight);
+doc.line(headerSplitX, headerTop, headerSplitX, headerTop + totalHeaderHeight);
+// Separator above ports grid (left panel only)
+doc.line(headerLeft, portsTop, headerSplitX, portsTop);
 
-    // Row 3
-    doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    doc.text('Place Of Delivery', pLeftX, portsTop + rowH * 2 + 4);
-    doc.setFont('arial', 'normal');
-    doc.text(podName || '', pLeftX, portsTop + rowH * 2 + 9);
-    doc.line(headerLeft, portsTop + rowH * 3, headerSplitX, portsTop + rowH * 3);
+doc.setFontSize(11);
+doc.setFont('arial', 'bold');
+const pLeftX = headerLeft + 5;
+const innerSplitX = headerLeft + Math.floor((headerSplitX - headerLeft) / 2);
+const pMidX = innerSplitX + 5; // right side of the left panel
 
-    // Row 4
-    doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    doc.text('Vessel & Voyage No.', pLeftX, portsTop + rowH * 3 + 4);
-    doc.setFontSize(10);
-    doc.setFont('arial', 'normal');
-    doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
+// Row 1: Place Of Acceptance only
+doc.text('Place Of Acceptance', pLeftX, portsTop + 4);
+doc.setFontSize(10);
+doc.setFont('arial', 'normal');
+doc.text(polName || '', pLeftX, portsTop + 9);
+
+// underline row 1
+doc.line(headerLeft, portsTop + rowH, headerSplitX, portsTop + rowH);
+
+// Row 2: Port Of Loading (left) + Port Of Discharge (right)
+doc.setFontSize(11);
+doc.setFont('arial', 'bold');
+doc.text('Port Of Loading', pLeftX, portsTop + rowH + 4);
+doc.setFontSize(10);
+doc.setFont('arial', 'normal');
+doc.text(polName || '', pLeftX, portsTop + rowH + 9);
+
+doc.setFontSize(11);
+doc.setFont('arial', 'bold');
+doc.text('Port Of Discharge', pMidX, portsTop + rowH + 4);
+doc.setFontSize(10);
+doc.setFont('arial', 'normal');
+doc.text(podName || '', pMidX, portsTop + rowH + 9);
+
+// underline row 2
+doc.line(headerLeft, portsTop + rowH * 2, headerSplitX, portsTop + rowH * 2);
+
+// Row 3: Place Of Delivery
+doc.setFontSize(11);
+doc.setFont('arial', 'bold');
+doc.text('Place Of Delivery', pLeftX, portsTop + rowH * 2 + 4);
+doc.setFont('arial', 'normal');
+doc.text(podName || '', pLeftX, portsTop + rowH * 2 + 9);
+
+// underline row 3
+doc.line(headerLeft, portsTop + rowH * 3, headerSplitX, portsTop + rowH * 3);
+
+// Row 4: Vessel & Voyage No.
+doc.setFontSize(11);
+doc.setFont('arial', 'bold');
+doc.text('Vessel & Voyage No.', pLeftX, portsTop + rowH * 3 + 4);
+doc.setFontSize(10);
+doc.setFont('arial', 'normal');
+doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
+
     // Removed final underline to avoid double line with the header box bottom border
 
     // Title positioned in right panel above table - moved down slightly
@@ -1117,4 +1123,3 @@ export async function generateBlPdf(
     console.error("Error generating BL PDF", err);
   }
 }
-
