@@ -561,10 +561,11 @@ export async function generateCroPdf(
 
         // --- RIGHT COLUMN SHIPMENT DETAILS ---
         addTextWithSpacing(doc, "CLOSING DATE/TIME:", "00:00:00", 120, shipmentDetailsStartY, 50);
-        addTextWithSpacing(doc, "POD:", groupPod, 120, shipmentDetailsStartY + 6, 50);
+            // Add product name below POD value
+        addTextWithSpacing(doc, "Product Name:", productName, 120, shipmentDetailsStartY + 6, 50);
+        addTextWithSpacing(doc, "POD:", groupPod, 120, shipmentDetailsStartY + 12, 50);
         
-        // Add product name below POD value
-        addTextWithSpacing(doc, "Product Name:", productName, 120, shipmentDetailsStartY + 12, 50);
+  
 
         // --- TERMS AND CONDITIONS ---
         const termsStartY = 150 + baseYOffset;
