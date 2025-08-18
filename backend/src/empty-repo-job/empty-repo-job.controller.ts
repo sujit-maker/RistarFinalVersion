@@ -26,14 +26,12 @@ export class EmptyRepoJobController {
     return this.service.findAll();
   }
 
-  @Get('job/next')
-  async getNextJobNumber() {
-    const jobNumber = await this.service.getNextJobNumber();
-    return { 
-      jobNumber,
-      houseBL: jobNumber // House BL is same as job number
-    };
-  }
+  // controller
+@Get('job/next')
+async getNextJobNumber() {
+  return this.service.getNextJobNumber();
+}
+
 
   @Get(':id')
   findOne(@Param('id') id: string) {

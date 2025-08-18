@@ -7,41 +7,42 @@ import { UpdateEmptyRepoJobDto } from './dto/update-emptyRepoJob.dto';
 export class EmptyRepoJobService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getNextJobNumber(): Promise<string> {
-    
-    const currentYear = new Date().getFullYear().toString().slice(-2); // "25"
-    
-   
-    const prefix = `RST/`;
-    const yearPart = `/${currentYear}/`;
+  /**
+   * Generate the next job number (preview version).
+   * Ports are placeholders here because we don't know them until create().
+   */
+async getNextJobNumber(): Promise<{ jobNumber: string; houseBL: string }> {
+  const currentYear = new Date().getFullYear().toString().slice(-2); // "25"
+  const prefix = `RST/[POL][POD]/${currentYear}/`;
 
-    // Get the latest job number to determine the next sequence
-    const latestJob = await this.prisma.emptyRepoJob.findFirst({
-      where: {
-        jobNumber: {
-          contains: yearPart,
-        },
-      },
-      orderBy: { jobNumber: 'desc' },
-    });
+  const latestJob = await this.prisma.emptyRepoJob.findFirst({
+    where: {
+      jobNumber: { startsWith: `${prefix}ER` },
+    },
+    orderBy: { jobNumber: 'desc' },
+  });
 
-    let nextSeq = 1;
-    if (latestJob?.jobNumber) {
-      // Extract sequence number from job number like "RST/NSAJEV/25/00001"
-      const parts = latestJob.jobNumber.split('/');
-      if (parts.length >= 4) {
-        const lastSeq = parseInt(parts[3]);
-        if (!isNaN(lastSeq)) {
-          nextSeq = lastSeq + 1;
-        }
+  let nextSeq = 1;
+  if (latestJob?.jobNumber) {
+    const parts = latestJob.jobNumber.split('/');
+    if (parts.length >= 4) {
+      const seqPart = parts[3].replace('ER', ''); // strip ER
+      const lastSeq = parseInt(seqPart, 10);
+      if (!isNaN(lastSeq)) {
+        nextSeq = lastSeq + 1;
       }
     }
-
-    const paddedSeq = String(nextSeq).padStart(5, '0');
-    
-    // Return a preview format - actual ports will be used when form is submitted
-    return `${prefix}[POL][POD]${yearPart}${paddedSeq}`;
   }
+
+  const paddedSeq = String(nextSeq).padStart(5, '0');
+  const jobNumber = `${prefix}ER${paddedSeq}`;
+
+  return {
+    jobNumber,
+    houseBL: jobNumber, // keep consistent with create()
+  };
+}
+
 
   async create(data: CreateEmptyRepoJobDto) {
     const { containers, polPortId, podPortId, ...jobData } = data;
@@ -61,18 +62,19 @@ export class EmptyRepoJobService {
       throw new Error('Invalid port IDs provided');
     }
 
-    // FIX: Use actual port codes instead of placeholders
+    // Use actual port codes
     const polCode = polPort.portCode || 'POL';
     const podCode = podPort.portCode || 'POD';
     const year = new Date().getFullYear().toString().slice(-2);
 
-    // Create the proper format: RST/NSAJEV/25/00001
+    // Build prefix: e.g. RST/NSAJEV/25/
     const portCombination = `${polCode}${podCode}`;
     const prefix = `RST/${portCombination}/${year}/`;
 
+    // Find last job for same prefix
     const latestJob = await this.prisma.emptyRepoJob.findFirst({
       where: {
-        jobNumber: { startsWith: prefix },
+        jobNumber: { startsWith: `${prefix}ER` },
       },
       orderBy: { jobNumber: 'desc' },
     });
@@ -81,7 +83,8 @@ export class EmptyRepoJobService {
     if (latestJob?.jobNumber) {
       const parts = latestJob.jobNumber.split('/');
       if (parts.length >= 4) {
-        const lastSeq = parseInt(parts[3]);
+        const seqPart = parts[3].replace('ER', '');
+        const lastSeq = parseInt(seqPart, 10);
         if (!isNaN(lastSeq)) {
           nextSeq = lastSeq + 1;
         }
@@ -89,13 +92,13 @@ export class EmptyRepoJobService {
     }
 
     const paddedSeq = String(nextSeq).padStart(5, '0');
-    const jobNumber = `${prefix}${paddedSeq}`;
+    const jobNumber = `${prefix}ER${paddedSeq}`;
 
     const parseDate = (d: string | Date | undefined) =>
       d ? new Date(d).toISOString() : new Date().toISOString();
 
     return this.prisma.$transaction(async (tx) => {
-      const houseBL = jobNumber; // House BL is same as job number
+      const houseBL = jobNumber; // House BL = job number
       
       // Build data object
       const jobDataForCreate: any = {
@@ -110,7 +113,6 @@ export class EmptyRepoJobService {
         estimateDate: parseDate(jobData.estimateDate),
       };
 
-      // Handle SOB date conditionally - only set if provided
       if (jobData.sob) {
         jobDataForCreate.sob = new Date(jobData.sob).toISOString();
       }
@@ -119,7 +121,7 @@ export class EmptyRepoJobService {
         data: jobDataForCreate,
       });
 
-      // Rest of the container creation logic remains the same...
+      // Container creation
       if (containers && containers.length > 0) {
         await tx.repoShipmentContainer.createMany({
           data: containers.map((c) => ({

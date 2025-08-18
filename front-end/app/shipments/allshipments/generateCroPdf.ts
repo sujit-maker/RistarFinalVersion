@@ -650,7 +650,6 @@ export async function generateCroPdf(
         doc.setFontSize(10);
         doc.text("SR NO.", 20, containerTableStartY);
         doc.text("TANK NO", 60, containerTableStartY);
-        doc.text("LAST 3 CARGO", 120, containerTableStartY);
 
         // Add horizontal line under headers
         doc.line(14, containerTableStartY + 3, 236, containerTableStartY + 3);
@@ -709,12 +708,7 @@ export async function generateCroPdf(
             doc.text("TEL: +65 6221 4844", 160, 31);
             doc.text("WWW.RISTARLOGISTICS.COM", 160, 36);
             
-            // Container table headers
-            doc.setFont("arial", "bold");
-            doc.setFontSize(10);
-            doc.text("SR NO.", 20, 50);
-            doc.text("TANK NO", 60, 50);
-            doc.text("LAST 3 CARGO", 120, 50);
+          
             
             // Add horizontal line under headers
             doc.setLineWidth(0.5);
@@ -751,18 +745,7 @@ export async function generateCroPdf(
           doc.setFontSize(10);
           doc.text(container.tare || "N/A", 88, adjustedYPos + 10);
           
-          // LAST 3 CARGO - use actual cargo history for this container
-          console.log(`PDF Generation - Container ${container.containerNumber} last3Cargo:`, container.last3Cargo);
-          const cargo1 = container.last3Cargo?.[0] || "N/A";
-          const cargo2 = container.last3Cargo?.[1] || "N/A";
-          const cargo3 = container.last3Cargo?.[2] || "N/A";
-          console.log(`PDF Display - Cargo1: ${cargo1}, Cargo2: ${cargo2}, Cargo3: ${cargo3}`);
-          
-          doc.setFont("arial", "normal");
-          doc.setFontSize(10);
-          doc.text(`1. ${cargo1}`, 120, adjustedYPos);
-          doc.text(`2. ${cargo2}`, 120, adjustedYPos + 5);
-          doc.text(`3. ${cargo3}`, 120, adjustedYPos + 10);
+     
           
           containersOnCurrentPage++;
         });
