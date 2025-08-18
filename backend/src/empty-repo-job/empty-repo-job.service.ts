@@ -198,40 +198,78 @@ async getNextJobNumber(): Promise<{ jobNumber: string; houseBL: string }> {
   }
 
   async update(id: number, data: UpdateEmptyRepoJobDto) {
-    const { containers, ...jobData } = data;
+  const { containers, ...jobData } = data;
 
-    return this.prisma.$transaction(async (tx) => {
-      const updatedJob = await tx.emptyRepoJob.update({
-        where: { id },
-        data: {
-          ...jobData,
-          date: jobData.date ? new Date(jobData.date) : undefined,
-          gsDate: jobData.gsDate ? new Date(jobData.gsDate) : undefined,
-          vesselName: jobData.vesselName,
-          sob: jobData.sob ? new Date(jobData.sob) : undefined,
-          etaTopod: jobData.etaTopod ? new Date(jobData.etaTopod) : undefined,
-          estimateDate: jobData.estimateDate
-            ? new Date(jobData.estimateDate)
-            : undefined,
-        },
-      });
-
-      await tx.repoShipmentContainer.deleteMany({
-        where: { shipmentId: id },
-      });
-
-      if (containers && containers.length > 0) {
-        await tx.repoShipmentContainer.createMany({
-          data: containers.map((container) => ({
-            ...container,
-            shipmentId: id,
-          })),
-        });
-      }
-
-      return updatedJob;
+  return this.prisma.$transaction(async (tx) => {
+    const updatedJob = await tx.emptyRepoJob.update({
+      where: { id },
+      data: {
+        ...jobData,
+        date: jobData.date ? new Date(jobData.date) : undefined,
+        gsDate: jobData.gsDate ? new Date(jobData.gsDate) : undefined,
+        vesselName: jobData.vesselName,
+        sob: jobData.sob ? new Date(jobData.sob) : undefined,
+        etaTopod: jobData.etaTopod ? new Date(jobData.etaTopod) : undefined,
+        estimateDate: jobData.estimateDate
+          ? new Date(jobData.estimateDate)
+          : undefined,
+      },
     });
-  }
+
+    // Fetch existing containers for this job
+    const existingContainers = await tx.repoShipmentContainer.findMany({
+      where: { shipmentId: id },
+    });
+
+    // Delete old container rows
+    await tx.repoShipmentContainer.deleteMany({ where: { shipmentId: id } });
+
+    const existingContainerNumbers = new Set(
+      existingContainers.map((c) => c.containerNumber),
+    );
+
+    if (containers && containers.length > 0) {
+      // Recreate container rows
+      await tx.repoShipmentContainer.createMany({
+        data: containers.map((container) => ({
+          ...container,
+          shipmentId: id,
+        })),
+      });
+
+      // For each container: only add ALLOTTED if it's a NEW one
+      for (const container of containers) {
+        if (!existingContainerNumbers.has(container.containerNumber)) {
+          const inventory = await tx.inventory.findFirst({
+            where: { containerNumber: container.containerNumber },
+          });
+
+          if (inventory) {
+            const leasingInfo = await tx.leasingInfo.findFirst({
+              where: { inventoryId: inventory.id },
+              orderBy: { createdAt: "desc" },
+            });
+
+            if (leasingInfo) {
+              await tx.movementHistory.create({
+                data: {
+                  inventoryId: inventory.id,
+                  portId: leasingInfo.portId,
+                  addressBookId: leasingInfo.onHireDepotaddressbookId,
+                  emptyRepoJobId: id,
+                  status: "ALLOTTED",
+                  date: new Date(),
+                },
+              });
+            }
+          }
+        }
+      }
+    }
+
+    return updatedJob;
+  });
+}
 
   async remove(id: number) {
     return this.prisma.$transaction(async (tx) => {

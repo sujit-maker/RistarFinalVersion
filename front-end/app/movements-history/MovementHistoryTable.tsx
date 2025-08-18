@@ -73,18 +73,30 @@ const [movementPermissions, setMovementPermissions] = useState<any>(null);
 
 
   const statusTransitions: Record<string, string[]> = {
-    ALLOTTED: ["EMPTY PICKED UP"],
-    "EMPTY PICKED UP": ["LADEN GATE-IN", "DAMAGED", "CANCELLED"],
-    "LADEN GATE-IN": ["SOB"],
-    SOB: ["LADEN DISCHARGE(ATA)"],
-    "LADEN DISCHARGE(ATA)": ["EMPTY RETURNED", "DAMAGED"],
-    "EMPTY RETURNED": ["AVAILABLE", "UNAVAILABLE"],
-    AVAILABLE: ["UNAVAILABLE"],
-    UNAVAILABLE: ["AVAILABLE"],
-    DAMAGED: ["RETURNED TO DEPOT"],
-    CANCELLED: ["RETURNED TO DEPOT"],
-    "RETURNED TO DEPOT": ["UNAVAILABLE", "AVAILABLE"],
-  };
+  ALLOTTED: ["EMPTY PICKED UP"],
+
+  "EMPTY PICKED UP": [], // handled dynamically
+
+  // GATE-IN
+  "LADEN GATE-IN": ["SOB"],
+  "EMPTY GATE-IN": ["SOB"],
+
+  // SOB → handled dynamically
+  SOB: [],
+
+  "LADEN DISCHARGE(ATA)": ["EMPTY RETURNED", "DAMAGED"],
+  "EMPTY DISCHARGE": ["EMPTY RETURNED", "DAMAGED"],
+
+  // RETURN / STORAGE
+  "EMPTY RETURNED": ["AVAILABLE", "UNAVAILABLE"],
+  AVAILABLE: ["UNAVAILABLE"],
+  UNAVAILABLE: ["AVAILABLE"],
+
+  // Exceptions
+  DAMAGED: ["RETURNED TO DEPOT"],
+  CANCELLED: ["RETURNED TO DEPOT"],
+  "RETURNED TO DEPOT": ["UNAVAILABLE", "AVAILABLE"],
+};
 
 
   useEffect(() => {
@@ -269,25 +281,56 @@ const [movementPermissions, setMovementPermissions] = useState<any>(null);
     );
   };
 
-  const handleUpdateStatusClick = () => {
-    const selectedRows = data.filter((row) => selectedIds.includes(row.id));
-    const currentStatuses = [...new Set(selectedRows.map((r) => r.status))];
+const handleUpdateStatusClick = () => {
+  const selectedRows = data.filter((row) => selectedIds.includes(row.id));
+  const currentStatuses = [...new Set(selectedRows.map((r) => r.status))];
 
-    if (currentStatuses.length !== 1) {
-      alert("Selected containers must all have the same current status.");
-      return;
+  if (currentStatuses.length !== 1) {
+    alert("Selected containers must all have the same current status.");
+    return;
+  }
+
+  const currentStatus = currentStatuses[0]?.toUpperCase();
+  const jobNumber =
+    selectedRows[0].shipment?.jobNumber ||
+    selectedRows[0].emptyRepoJob?.jobNumber ||
+    selectedRows[0].jobNumber ||
+    "";
+
+  // ✅ Special case: EMPTY PICKED UP
+  if (currentStatus === "EMPTY PICKED UP") {
+    if (selectedRows[0].shipment) {
+      setAvailableStatusOptions(["LADEN GATE-IN", "DAMAGED", "CANCELLED"]);
+    } else if (selectedRows[0].emptyRepoJob) {
+      setAvailableStatusOptions(["EMPTY GATE-IN", "DAMAGED", "CANCELLED"]);
+    } else {
+      setAvailableStatusOptions(["DAMAGED", "CANCELLED"]); // fallback
     }
+  }
 
-    const currentStatus = currentStatuses[0]?.toUpperCase();
-    const jobNumber =
-      selectedRows[0].shipment?.jobNumber || selectedRows[0].emptyRepoJob?.jobNumber || "" || selectedRows[0].jobNumber || "";
+  // ✅ Special case: SOB
+  else if (currentStatus === "SOB") {
+    if (selectedRows[0].shipment) {
+      setAvailableStatusOptions(["LADEN DISCHARGE(ATA)", "DAMAGED"]);
+    } else if (selectedRows[0].emptyRepoJob) {
+      setAvailableStatusOptions(["EMPTY DISCHARGE", "DAMAGED"]);
+    } else {
+      setAvailableStatusOptions(["DAMAGED"]); // fallback
+    }
+  }
 
+  // ✅ Default case (from statusTransitions map)
+  else {
     setAvailableStatusOptions(statusTransitions[currentStatus] || []);
-    setNewStatus("");
-    setJobNumberForUpdate(jobNumber);
-    setRemarks("");
-    setModalOpen(true);
-  };
+  }
+
+  setNewStatus("");
+  setJobNumberForUpdate(jobNumber);
+  setRemarks("");
+  setModalOpen(true);
+};
+
+
 
   // Fetch locations by port
   const fetchLocationsByPort = async (portId: number) => {
@@ -347,19 +390,30 @@ const [movementPermissions, setMovementPermissions] = useState<any>(null);
           break;
 
         case "LADEN GATE-IN":
-          portId = source?.polPortId;
-          addressBookId = null;
-          break;
+case "EMPTY GATE-IN":
+  portId = source?.polPortId;
+  addressBookId = null;
+  break;
+
 
         case "SOB":
           portId = source?.podPortId || source?.polPortId;
           addressBookId = selectedCarrierId || source?.carrierAddressBookId || null;
           break;
 
-        case "LADEN DISCHARGE(ATA)":
-          portId = source?.podPortId;
-          addressBookId = null;
-          break;
+       case 'LADEN DISCHARGE(ATA)':
+case 'EMPTY DISCHARGE':
+  if (emptyRepoJob) {
+    status = 'EMPTY DISCHARGE';
+    portId = emptyRepoJob.podPortId ?? null;
+    addressBookId = null;
+  } else {
+    status = 'LADEN DISCHARGE(ATA)';
+    portId = shipment?.podPortId ?? null;
+    addressBookId = null;
+  }
+  break;
+
 
         case "EMPTY RETURNED":
           portId = source?.podPortId;
@@ -442,6 +496,36 @@ const [movementPermissions, setMovementPermissions] = useState<any>(null);
       alert("Failed to update date.");
     }
   };
+
+  useEffect(() => {
+  if (
+    (newStatus === "EMPTY RETURNED" || newStatus === "RETURNED TO DEPOT") &&
+    selectedIds.length > 0
+  ) {
+    const selectedRow = data.find((d) => selectedIds.includes(d.id));
+    if (selectedRow) {
+      const portId = selectedRow.port?.id || null;
+      setSelectedPortId(portId);
+
+      // 🔥 Auto-load depots for this port
+      if (portId) {
+        axios.get("http://localhost:8000/addressbook").then((res) => {
+          const filtered = res.data.filter((entry: any) => {
+            return (
+              entry.businessType?.includes("Depot Terminal") &&
+              entry.businessPorts.some((bp: any) => bp.portId === portId)
+            );
+          });
+          setDepots(filtered);
+        });
+      }
+
+      // preselect depot if already present
+      setSelectedDepotId(selectedRow.addressBook?.id || null);
+    }
+  }
+}, [newStatus, selectedIds]);
+
 
   return (
     <div className="p-6 my-0 bg-white dark:bg-neutral-950 text-gray-900 dark:text-white min-h-screen mb-6">
@@ -741,7 +825,7 @@ const [movementPermissions, setMovementPermissions] = useState<any>(null);
               {(newStatus === "EMPTY RETURNED" || newStatus === "RETURNED TO DEPOT") && (
                 <div className="space-y-4">
                   {/* Port Dropdown */}
-                  {/* <div className="space-y-2">
+                   {/* <div className="space-y-2">
                      <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Select Port</label>
                      <select
                        value={selectedPortId || ""}
@@ -759,7 +843,7 @@ const [movementPermissions, setMovementPermissions] = useState<any>(null);
                          </option>
                        ))}
                      </select>
-                   </div> */}
+                   </div>  */}
 
                   {/* Depot Dropdown */}
                   <div className="space-y-2">

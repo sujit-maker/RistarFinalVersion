@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { MovementHistory } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
 
@@ -15,13 +19,13 @@ export class MovementHistoryService {
         shipment: {
           select: {
             jobNumber: true,
-            vesselName: true, // ✅
+            vesselName: true,
           },
         },
         emptyRepoJob: {
           select: {
             jobNumber: true,
-            vesselName: true, // ✅
+            vesselName: true,
           },
         },
       },
@@ -70,6 +74,111 @@ export class MovementHistoryService {
     });
   }
 
+  /**
+   * Shared logic for handling status transitions
+   */
+  private async resolveStatusTransition(
+    status: string,
+    prev: MovementHistory,
+    shipment?: any | null,
+    emptyRepoJob?: any | null,
+    addressBookIdFromFrontend?: number,
+    remarks?: string,
+    vesselName?: string,
+  ) {
+    let portId: number | null = prev.portId;
+    let addressBookId: number | null =
+      addressBookIdFromFrontend ?? prev.addressBookId ?? null;
+
+    switch (status) {
+      case 'EMPTY PICKED UP':
+        portId =
+          prev.portId ?? shipment?.polPortId ?? emptyRepoJob?.polPortId ?? null;
+        addressBookId = prev.addressBookId ?? null;
+        break;
+
+      case 'LADEN GATE-IN':
+      case 'EMPTY GATE-IN':
+        if (emptyRepoJob) {
+          status = 'EMPTY GATE-IN';
+          portId = emptyRepoJob.polPortId!;
+          addressBookId = null;
+        } else {
+          status = 'LADEN GATE-IN';
+          portId = shipment?.polPortId ?? null;
+          addressBookId = null;
+        }
+        break;
+
+      case 'SOB':
+        portId =
+          shipment?.podPortId ??
+          shipment?.polPortId ??
+          emptyRepoJob?.podPortId ??
+          emptyRepoJob?.polPortId ??
+          null;
+        addressBookId =
+          addressBookIdFromFrontend ??
+          shipment?.carrierAddressBookId ??
+          emptyRepoJob?.carrierAddressBookId ??
+          null;
+        break;
+
+      case 'LADEN DISCHARGE(ATA)':
+        if (emptyRepoJob) {
+          status = 'EMPTY DISCHARGE';
+          portId = emptyRepoJob.podPortId ?? null;
+        } else {
+          status = 'LADEN DISCHARGE(ATA)';
+          portId = shipment?.podPortId ?? null;
+        }
+        addressBookId = null;
+        break;
+
+      case 'EMPTY DISCHARGE': // ✅ allow frontend to send it directly
+        status = 'EMPTY DISCHARGE';
+        portId = emptyRepoJob?.podPortId ?? null;
+        addressBookId = null;
+        break;
+
+      case 'EMPTY RETURNED':
+        portId = shipment?.podPortId ?? emptyRepoJob?.podPortId ?? null;
+        addressBookId =
+          shipment?.emptyReturnDepotAddressBookId ??
+          emptyRepoJob?.emptyReturnDepotAddressBookId ??
+          null;
+        break;
+
+      case 'AVAILABLE':
+      case 'UNAVAILABLE':
+      case 'DAMAGED':
+      case 'CANCELLED':
+      case 'RETURNED TO DEPOT':
+        if (!portId) portId = prev.portId;
+        if (!addressBookId) addressBookId = prev.addressBookId;
+        break;
+
+      default:
+        throw new BadRequestException(
+          `Unsupported status transition: ${status}`,
+        );
+    }
+
+    if (!portId) {
+      throw new BadRequestException(
+        `portId cannot be null or undefined for movement ID ${prev.id}`,
+      );
+    }
+
+    return {
+      portId,
+      addressBookId,
+      remarks: remarks?.trim() || null,
+      vesselName: vesselName?.trim() || null,
+      status, // return possibly updated status
+    };
+  }
+
   async bulkUpdateStatus(
     ids: number[],
     newStatus: string,
@@ -78,7 +187,6 @@ export class MovementHistoryService {
     vesselName?: string,
     addressBookIdFromFrontend?: number,
   ) {
-    // First try to find the shipment
     const shipment = await this.prisma.shipment.findFirst({
       where: { jobNumber },
       include: {
@@ -88,7 +196,6 @@ export class MovementHistoryService {
       },
     });
 
-    // Fallback to EmptyRepoJob
     const emptyRepoJob = !shipment
       ? await this.prisma.emptyRepoJob.findFirst({
           where: { jobNumber },
@@ -110,69 +217,21 @@ export class MovementHistoryService {
       });
       if (!prev) throw new NotFoundException(`MovementHistory ${id} not found`);
 
-      let portId: number = prev.portId;
-      let finalRemarks: string | null = remarks?.trim() || null;
-      let addressBookId: number | null =
-        addressBookIdFromFrontend ?? prev.addressBookId ?? null;
-
-      switch (status) {
-        case 'EMPTY PICKED UP':
-          portId =
-            prev.portId ?? shipment?.polPortId ?? emptyRepoJob?.polPortId!;
-          addressBookId = prev.addressBookId ?? null;
-          break;
-
-        case 'LADEN GATE-IN':
-          portId = shipment?.polPortId ?? emptyRepoJob?.polPortId!;
-          addressBookId = null;
-          break;
-
-        case 'SOB':
-          portId =
-            shipment?.podPortId ??
-            shipment?.polPortId ??
-            emptyRepoJob?.podPortId ??
-            emptyRepoJob?.polPortId!;
-
-          addressBookId =
-            addressBookIdFromFrontend ??
-            shipment?.carrierAddressBookId ??
-            emptyRepoJob?.carrierAddressBookId ??
-            null;
-          break;
-
-        case 'LADEN DISCHARGE(ATA)':
-          portId = shipment?.podPortId ?? emptyRepoJob?.podPortId!;
-          addressBookId = null;
-          break;
-
-        case 'EMPTY RETURNED':
-          portId = shipment?.podPortId ?? emptyRepoJob?.podPortId!;
-          addressBookId =
-            shipment?.emptyReturnDepotAddressBookId ??
-            emptyRepoJob?.emptyReturnDepotAddressBookId ??
-            null;
-          break;
-
-        case 'AVAILABLE':
-        case 'UNAVAILABLE':
-        case 'DAMAGED':
-        case 'CANCELLED':
-          if (!portId) portId = prev.portId;
-          if (addressBookId === null || addressBookId === undefined) {
-            addressBookId = prev.addressBookId;
-          }
-          break;
-
-        default:
-          throw new Error(`Unsupported status transition: ${status}`);
-      }
-
-      if (!portId) {
-        throw new Error(
-          `portId cannot be null or undefined for movement ID ${id}`,
-        );
-      }
+      const {
+        portId,
+        addressBookId,
+        remarks: finalRemarks,
+        vesselName: finalVesselName,
+        status: finalStatus,
+      } = await this.resolveStatusTransition(
+        status,
+        prev,
+        shipment,
+        emptyRepoJob,
+        addressBookIdFromFrontend,
+        remarks,
+        vesselName,
+      );
 
       return this.prisma.movementHistory.create({
         data: {
@@ -181,10 +240,10 @@ export class MovementHistoryService {
           emptyRepoJobId: prev.emptyRepoJobId ?? emptyRepoJob?.id ?? null,
           portId,
           addressBookId,
-          status,
+          status: finalStatus,
           date: new Date(),
           remarks: finalRemarks,
-          vesselName: vesselName?.trim() || null,
+          vesselName: finalVesselName,
         },
       });
     });
@@ -217,119 +276,76 @@ export class MovementHistoryService {
     });
 
     if (!previous) {
-      console.error(`❌ MovementHistory with ID ${prevId} not found`);
       throw new NotFoundException(
         `MovementHistory with ID ${prevId} not found`,
       );
     }
-    // Fetch shipment info once if needed
-    type ShipmentInfo = {
-      polPortId: number | null;
-      podPortId: number | null;
-      carrierAddressBookId: number | null;
-      emptyReturnDepotAddressBookId: number | null;
-    } | null;
 
-    let shipment: ShipmentInfo = null;
-    if (
-      ['LADEN GATE-IN', 'SOB', 'EMPTY RETURNED'].includes(
-        newStatus.toUpperCase(),
-      )
-    ) {
-      if (previous.shipmentId) {
-        shipment = await this.prisma.shipment.findUnique({
-          where: { id: previous.shipmentId },
-          select: {
-            polPortId: true,
-            podPortId: true,
-            carrierAddressBookId: true,
-            emptyReturnDepotAddressBookId: true,
-          },
-        });
-      } else if (previous.emptyRepoJobId) {
-        shipment = await this.prisma.emptyRepoJob.findUnique({
-          where: { id: previous.emptyRepoJobId },
-          select: {
-            polPortId: true,
-            podPortId: true,
-            carrierAddressBookId: true,
-            emptyReturnDepotAddressBookId: true,
-          },
-        });
-      } else {
-        throw new Error(
-          `No shipmentId or emptyRepoJobId for movement ID ${prevId}`,
-        );
-      }
+    // fetch shipment or emptyRepoJob if needed
+    let shipment: any | null = null;
+    let emptyRepoJob: any | null = null;
+
+    if (previous.shipmentId) {
+      shipment = await this.prisma.shipment.findUnique({
+        where: { id: previous.shipmentId },
+        select: {
+          polPortId: true,
+          podPortId: true,
+          carrierAddressBookId: true,
+          emptyReturnDepotAddressBookId: true,
+        },
+      });
+    } else if (previous.emptyRepoJobId) {
+      emptyRepoJob = await this.prisma.emptyRepoJob.findUnique({
+        where: { id: previous.emptyRepoJobId },
+        select: {
+          polPortId: true,
+          podPortId: true,
+          carrierAddressBookId: true,
+          emptyReturnDepotAddressBookId: true,
+        },
+      });
     }
 
-    // Apply custom logic based on status
     const status = newStatus.toUpperCase();
-    if (status === 'EMPTY PICKED UP') {
-      portId = previous.portId;
-      addressBookId = previous.addressBookId;
-    } else if (status === 'LADEN GATE-IN') {
-      portId = shipment?.polPortId ?? null;
-      addressBookId = null;
-    }else if (status === 'SOB') {
-  portId = shipment?.podPortId ?? shipment?.polPortId ?? null;
-  if (addressBookId == null) {
-    addressBookId = shipment?.carrierAddressBookId ?? null;
-  }
 
-    } else if (status === 'EMPTY RETURNED') {
-      portId = shipment?.podPortId ?? null;
-      addressBookId = shipment?.emptyReturnDepotAddressBookId ?? null;
-    } else if (
-      [
-        'DAMAGED',
-        'CANCELLED',
-        'RETURNED TO DEPOT',
-        'AVAILABLE',
-        'UNAVAILABLE',
-      ].includes(status)
-    ) {
-      // Use previous values
-      portId = portId ?? previous.portId;
-      addressBookId = addressBookId ?? previous.addressBookId;
-    } else {
-      // fallback safeguard
-      if (portId == null) portId = previous.portId;
-      if (typeof addressBookId === 'undefined')
-        addressBookId = previous.addressBookId;
-    }
+    const {
+      portId: finalPortId,
+      addressBookId: finalAddressBookId,
+      remarks: finalRemarks,
+      vesselName: finalVesselName,
+      status: finalStatus,
+    } = await this.resolveStatusTransition(
+      status,
+      previous,
+      shipment,
+      emptyRepoJob,
+      addressBookId ?? undefined,
+      remarks,
+      vesselName,
+    );
 
-    if (portId == null) {
-      console.error(`❌ portId is null/undefined for movement ID ${prevId}`);
-      throw new Error(
-        `portId cannot be null or undefined for movement ID ${prevId}`,
-      );
-    }
-
-    const newEntry = await this.prisma.movementHistory.create({
+    return this.prisma.movementHistory.create({
       data: {
         inventoryId: previous.inventoryId,
         shipmentId: previous.shipmentId ?? null,
         emptyRepoJobId: previous.emptyRepoJobId ?? null,
-        portId,
-        addressBookId,
-        status,
+        portId: finalPortId,
+        addressBookId: finalAddressBookId,
+        status: finalStatus,
         date: new Date(),
-        remarks: remarks?.trim() || null,
-        vesselName: vesselName?.trim() || null,
+        remarks: finalRemarks,
+        vesselName: finalVesselName,
       },
     });
-
-    return newEntry;
   }
 
-  // In MovementHistoryService
   async findLatestPerContainer() {
     const latestMovements = await this.prisma.$queryRaw<
       MovementHistory[]
     >`SELECT DISTINCT ON ("inventoryId") *
-     FROM "MovementHistory"
-     ORDER BY "inventoryId", "date" DESC`;
+       FROM "MovementHistory"
+       ORDER BY "inventoryId", "date" DESC`;
 
     const ids = latestMovements.map((m) => m.id);
 
