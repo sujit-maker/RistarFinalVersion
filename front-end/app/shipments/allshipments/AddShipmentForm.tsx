@@ -696,7 +696,16 @@ const AddShipmentModal = ({
                   };
                 });
 
-              setContainers(availableContainers);
+              // Combine available containers with previously selected containers
+              // to ensure selected containers remain visible even when filters change
+              const availableContainerIds = new Set(availableContainers.map((container: any) => container.id));
+              const previouslySelectedNotInAvailable = modalSelectedContainers.filter(
+                (container: any) => !availableContainerIds.has(container.id)
+              );
+              
+              const combinedContainers = [...availableContainers, ...previouslySelectedNotInAvailable];
+              
+              setContainers(combinedContainers);
             });
         })
         .catch((err) => {
@@ -706,8 +715,9 @@ const AddShipmentModal = ({
     } else {
       setContainers([]);
     }
-    setModalSelectedContainers([]);
-  }, [selectedPort, selectedOnHireDepot]);
+    // Remove this line to preserve selected containers when filters change
+    // setModalSelectedContainers([]);
+  }, [selectedPort, selectedOnHireDepot, modalSelectedContainers]);
 
   useEffect(() => {
     const fetchAgents = async () => {

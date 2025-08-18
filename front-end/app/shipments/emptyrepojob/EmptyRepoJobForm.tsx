@@ -31,15 +31,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Plus, AlertTriangle } from "lucide-react";
 
-type Option = { id: string | number; name: string };
-type SelectOptions = {
-  customer: Option[];
-  product: Option[];
-  port: Option[];
-  agent: Option[];
-  depot: Option[];
-  shippingTerm: Option[];
-};
+
 
 type ContainerItem = {
   containerNumber: string;
@@ -225,14 +217,7 @@ const AddShipmentModal = ({
     setSuggestions([]);
   };
 
-  const [selectOptions, setSelectOptions] = useState<SelectOptions>({
-    customer: [],
-    product: [],
-    port: [],
-    agent: [],
-    depot: [],
-    shippingTerm: [],
-  });
+  
 
   // Update the handleSubmit function to properly handle transhipment port
   const handleSubmit = async (e: React.FormEvent) => {
@@ -494,7 +479,7 @@ const AddShipmentModal = ({
       setEmptyReturnDepots([]);
     }
   }, [form.portOfDischargeId]);
-
+                                        
   useEffect(() => {
     const fetchNextJobNumber = async () => {
       try {

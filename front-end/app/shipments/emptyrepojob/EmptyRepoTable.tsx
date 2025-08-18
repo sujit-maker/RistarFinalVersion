@@ -329,7 +329,7 @@ const EmptyRepo = () => {
                   <TableCell>{job.polPort?.portName || '-'}</TableCell>
                   <TableCell>{job.podPort?.portName || '-'}</TableCell>
                   <TableCell>{job.vesselName || '-'}</TableCell>
-                  <TableCell>{job.sob ? new Date(job.sob).toLocaleDateString() : '-'}</TableCell>
+<TableCell>{job.etaTopod ? new Date(job.etaTopod).toLocaleDateString() : '-'}</TableCell>
                   <TableCell>
                     {(job.containers ?? [])
                       .map((c: any) => c.containerNumber)
