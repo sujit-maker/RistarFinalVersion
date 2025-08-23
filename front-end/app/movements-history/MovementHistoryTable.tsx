@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { apiFetch } from "../../lib/api";
 
 interface MovementRow {
   id: number;
@@ -458,15 +459,16 @@ case 'EMPTY DISCHARGE':
       if (addressBookId !== undefined) payload.addressBookId = addressBookId;
       console.log("Payload being sent:", payload);
 
-      await axios.post("http://localhost:8000/movement-history/bulk-create", payload);
+await apiFetch('http://localhost:8000/movement-history/bulk-update', {
+  method: 'POST',
+  body: payload,   // 👈 plain object, no JSON.stringify
+});
 
       alert("Status updated.");
       setSelectedIds([]);
       setModalOpen(false);
       setSelectedCarrierId(null);
       setVesselName("");
-
-
 
       const res = await axios.get("http://localhost:8000/movement-history/latest");
       setData(res.data);
@@ -481,9 +483,11 @@ case 'EMPTY DISCHARGE':
     if (!editingRow) return;
 
     try {
-      await axios.patch(`http://localhost:8000/movement-history/${editingRow.id}`, {
-        date: editDate,
-      });
+  await apiFetch(`http://localhost:8000/movement-history/${editingRow.id}`, {
+    method: 'PATCH',
+    body: { date: editDate },   // 👈 pass plain object
+  });
+      
 
       alert("Date updated successfully.");
       setEditModalOpen(false);

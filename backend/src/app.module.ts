@@ -30,6 +30,8 @@ import { PermissionsModule } from './permissions/permissions.module';
 import { BillOfLadingModule } from './bill-of-lading/bill-of-lading.module';
 import { ConfigModule } from '@nestjs/config';
 import { UserModule } from './user/user.module';
+import { AuditController } from './audit/audit.controller';
+import { AuditModule } from './audit/audit.module';
 
 @Module({
   imports: [ 
@@ -59,10 +61,11 @@ import { UserModule } from './user/user.module';
     PermissionsModule,
     BillOfLadingModule,
     UserModule,
+    AuditModule,
 
   ],
 
-  controllers: [AppController, AddressbookController],
+  controllers: [AppController, AddressbookController, AuditController],
   providers: [AppService, AddressbookService],
 })
 export class AppModule {}

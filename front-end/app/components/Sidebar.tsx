@@ -200,6 +200,12 @@ const navItems = [
         icon: <Upload size={14} className="mr-2" />,
         module: "DataImport",
       },
+       {
+        label: "Audit Logs",
+        href: "/settings/auditlogs",
+        icon: <Upload size={14} className="mr-2" />,
+        module: "AuditLogs",
+      },
     ],
   },
 ];
@@ -296,11 +302,27 @@ export default function SidebarWithHeader({
     return item.children.some((child: any) => canReadModule(child.module));
   };
 
-  const handleLogout = () => {
+// somewhere you can import router + toast if you use it
+const handleLogout = async () => {
+  try {
+    const token = localStorage.getItem('access_token'); // read BEFORE clearing
+    await fetch('http://localhost:8000/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      credentials: 'include',
+    });
+  } catch (e) {
+    // ignore network errors; we'll still clear session
+  } finally {
     localStorage.clear();
     sessionStorage.clear();
-    router.push("/login");
-  };
+    router.push('/login');
+  }
+};
+
 
   return (
     <MemoizedThemeWrapper className="flex h-screen bg-gray-50 dark:bg-neutral-950">

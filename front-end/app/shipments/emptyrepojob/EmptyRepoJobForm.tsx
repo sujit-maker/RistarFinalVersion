@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Plus, AlertTriangle } from "lucide-react";
+import { apiFetch } from "../../../lib/api";
 
 
 
@@ -317,14 +318,20 @@ const AddShipmentModal = ({
 
       if (form.id) {
         // For PATCH (Edit)
-        await axios.patch(
+        await apiFetch(
           `http://localhost:8000/empty-repo-job/${form.id}`,
-          payload
+          {
+            method: 'PATCH',
+            body: JSON.stringify(payload),
+          }
         );
         alert("Empty repo job updated successfully!");
       } else {
         // For POST (New)
-        await axios.post("http://localhost:8000/empty-repo-job", payload);
+        await apiFetch("http://localhost:8000/empty-repo-job", {
+          method: 'POST',
+          body: JSON.stringify(payload),
+        });
         alert("Empty repo job created successfully!");
       }
 
@@ -862,7 +869,7 @@ const AddShipmentModal = ({
                     )}
                   </div>
 
-                  <div>
+                  {/* <div>
                     <Label
                       htmlFor="jobNumber"
                       className="block text-sm text-gray-900 dark:text-neutral-200 mb-1"
@@ -876,9 +883,9 @@ const AddShipmentModal = ({
                       className="w-full p-2.5 bg-neutral-100 dark:bg-neutral-700 text-gray-900 dark:text-neutral-300 rounded border border-neutral-200 dark:border-neutral-600 cursor-not-allowed"
                       placeholder="Auto-generated..."
                     />
-                  </div>
+                  </div> */}
 
-                  <div>
+                  {/* <div>
                     <Label
                       htmlFor="houseBL"
                       className="block text-sm text-gray-900 dark:text-neutral-200 mb-1"
@@ -892,7 +899,7 @@ const AddShipmentModal = ({
                       className="w-full p-2.5 bg-neutral-100 dark:bg-neutral-700 text-gray-900 dark:text-neutral-300 rounded border border-neutral-200 dark:border-neutral-600 cursor-not-allowed"
                       placeholder="Auto-generated..."
                     />
-                  </div>
+                  </div> */}
 
                   <div>
                     <Label
@@ -911,6 +918,7 @@ const AddShipmentModal = ({
                         }
                       }}
                       placeholder="CY-CY"
+                      readOnly
                       className="w-full p-2.5 bg-white text-gray-900 dark:bg-neutral-900 dark:text-white rounded border border-neutral-200 dark:border-neutral-700"
                     />
                     {validationErrors.shippingTerm && (

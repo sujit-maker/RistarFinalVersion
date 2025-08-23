@@ -7,15 +7,18 @@ import {
   Param,
   Body,
   ParseIntPipe,
+  UseGuards,
 } from '@nestjs/common';
 import { QuotationService } from './quotation.service';
 import { CreateQuotationDto } from './dto/create-quotation.dto';
 import { UpdateQuotationDto } from './dto/update-quotation.dto';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('quotations')
 export class QuotationController {
   constructor(private readonly quotationService: QuotationService) {}
 
+  @UseGuards(AuthGuard('jwt'))
   @Post()
   create(@Body() createQuotationDto: CreateQuotationDto) {
     
@@ -39,6 +42,7 @@ export class QuotationController {
     return this.quotationService.findOne(id);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -47,6 +51,7 @@ export class QuotationController {
     return this.quotationService.update(id, updateQuotationDto);
   }
 
+  @UseGuards(AuthGuard('jwt'))
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.quotationService.remove(id);

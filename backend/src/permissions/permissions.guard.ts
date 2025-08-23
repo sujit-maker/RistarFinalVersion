@@ -10,7 +10,6 @@ export class PermissionsGuard extends AuthGuard('jwt') {
     super();
   }
 
-// src/permissions/permissions.guard.ts
 async canActivate(context: ExecutionContext): Promise<boolean> {
   const { moduleName, action } =
     this.reflector.get<{ moduleName: string; action: string }>(
@@ -19,12 +18,11 @@ async canActivate(context: ExecutionContext): Promise<boolean> {
     ) || {};
 
   if (!moduleName || !action) {
-    return true; // No permission required
+    return true; 
   }
 
   const request = context.switchToHttp().getRequest();
   
-  // Take userId from query or body
   const userId = Number(request.query?.userId || request.body?.userId);
   
   if (!userId) {

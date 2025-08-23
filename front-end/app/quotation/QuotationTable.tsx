@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { Pencil, Trash2, Eye, Download, Loader, Plus } from 'lucide-react';
-import AddQuotationModal from './QuotationForm';
 import ViewQuotationModal from './ViewQuotationModal';
 import {
   Table,
@@ -14,6 +13,8 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { toast } from 'react-hot-toast';
+import AddQuotationModal from './QuotationForm';
+import { apiFetch } from '../../lib/api';
 
 const QuotationPage = () => {
   const [showModal, setShowModal] = useState(false);
@@ -358,9 +359,10 @@ const QuotationPage = () => {
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this quotation?')) return;
     try {
-      await fetch(`http://localhost:8000/quotations/${id}`, {
-        method: 'DELETE',
-      });
+           await apiFetch(`http://localhost:8000/quotations/${id}`, {
+             method: 'DELETE',
+           });
+     
       fetchQuotations();
     } catch (err) {
       console.error('Failed to delete quotation:', err);
@@ -373,22 +375,21 @@ const QuotationPage = () => {
         <div className="relative w-full mr-4">
           <p className="text-xl font-bold text-gray-900 dark:text-white">Quotation</p>
         </div>
-      <Button
-  className={`bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium py-2 px-6 shadow rounded-md whitespace-nowrap cursor-pointer ${
-    !permissions?.canCreate ? "opacity-50 cursor-not-allowed" : ""
-  }`}
-  onClick={() => {
-    if (permissions?.canCreate) {
-      setFormData(defaultFormData());
-      setShowModal(true);
-    } else {
-      alert("You don't have access to create quotations.");
-    }
-  }}
->
-  <Plus size={16} className="mr-2" />
-  Create Quote
-</Button>
+        <Button
+          className={`bg-blue-700 hover:bg-blue-800 text-white text-sm font-medium py-2 px-6 shadow rounded-md whitespace-nowrap cursor-pointer ${!permissions?.canCreate ? "opacity-50 cursor-not-allowed" : ""
+            }`}
+          onClick={() => {
+            if (permissions?.canCreate) {
+              setFormData(defaultFormData());
+              setShowModal(true);
+            } else {
+              alert("You don't have access to create quotations.");
+            }
+          }}
+        >
+          <Plus size={16} className="mr-2" />
+          Create Quote
+        </Button>
 
       </div>
 
@@ -471,43 +472,41 @@ const QuotationPage = () => {
                     </Button>
 
                     {/* Existing edit button */}
-                   <Button
-  variant="ghost"
-  size="icon"
-  onClick={() => {
-    if (permissions?.canEdit) {
-      handleEdit(q);
-    } else {
-      alert("You don't have access to edit quotations.");
-    }
-  }}
-  className={`h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-900/40 dark:hover:bg-blue-900/40 ${
-    !permissions?.canEdit ? "opacity-50 cursor-not-allowed" : ""
-  }`}
-  title="Edit"
->
-  <Pencil size={16} />
-</Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (permissions?.canEdit) {
+                          handleEdit(q);
+                        } else {
+                          alert("You don't have access to edit quotations.");
+                        }
+                      }}
+                      className={`h-8 w-8 text-blue-400 hover:text-blue-300 hover:bg-blue-900/40 dark:hover:bg-blue-900/40 ${!permissions?.canEdit ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      title="Edit"
+                    >
+                      <Pencil size={16} />
+                    </Button>
 
 
                     {/* Existing delete button */}
-                  <Button
-  variant="ghost"
-  size="icon"
-  onClick={() => {
-    if (permissions?.canDelete) {
-      handleDelete(q.id);
-    } else {
-      alert("You don't have access to delete quotations.");
-    }
-  }}
-  className={`h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-900/40 dark:hover:bg-red-900/40 ${
-    !permissions?.canDelete ? "opacity-50 cursor-not-allowed" : ""
-  }`}
-  title="Delete"
->
-  <Trash2 size={16} />
-</Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        if (permissions?.canDelete) {
+                          handleDelete(q.id);
+                        } else {
+                          alert("You don't have access to delete quotations.");
+                        }
+                      }}
+                      className={`h-8 w-8 text-red-400 hover:text-red-300 hover:bg-red-900/40 dark:hover:bg-red-900/40 ${!permissions?.canDelete ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                      title="Delete"
+                    >
+                      <Trash2 size={16} />
+                    </Button>
 
                   </div>
                 </TableCell>

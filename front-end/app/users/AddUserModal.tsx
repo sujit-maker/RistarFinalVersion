@@ -21,7 +21,7 @@ export default function AddUserModal({
     departmentName: "",
     email: "",
     contact: "",
-    userType: ""
+    userType: "USER"
   });
 
   // Populate form when editing
@@ -35,7 +35,7 @@ export default function AddUserModal({
         departmentName: editUser.departmentName || "",
         email: editUser.email || "",
         contact: editUser.contact || "",
-        userType: editUser.userType || ""
+        userType: editUser.userType || "USER"
       });
     } else {
       setFormData({
@@ -46,7 +46,7 @@ export default function AddUserModal({
         departmentName: "",
         email: "",
         contact: "",
-        userType: ""
+        userType: "USER"
       });
     }
   }, [editUser]);
@@ -162,7 +162,7 @@ export default function AddUserModal({
             <option value="admin">Admin</option>
           </select>
 
-          <label className="block text-sm font-medium">User Type</label>
+          {/* <label className="block text-sm font-medium">User Type</label>
           <select
             name="userType"
             value={formData.userType}
@@ -173,7 +173,7 @@ export default function AddUserModal({
             <option value="SUPERADMIN">SUPERADMIN</option>
             <option value="ADMIN">ADMIN</option>
             <option value="USER">USER</option>
-          </select>
+          </select> */}
         </div>
 
         <div className="flex justify-end gap-2 mt-4">

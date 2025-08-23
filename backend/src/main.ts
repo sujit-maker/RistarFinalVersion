@@ -2,31 +2,34 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
+import { ContextInterceptor } from './common/interceptors/context.interceptor'; // ← add this import
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-  // Enable CORS for all origins (or restrict to localhost:3000 if you want)
+  // (Optional but useful if behind proxy/load balancer)
+  app.set('trust proxy', 1);
+
+  // Enable CORS
   app.enableCors({
     origin: 'http://localhost:3000',
     credentials: true,
   });
 
-  // Serve static files for certificates
+  // Serve static files
   app.useStaticAssets(join(process.cwd(), 'uploads', 'certificates'), {
     prefix: '/tankcertificate/uploads/certificates/',
   });
-
-  // Serve static files for reports
   app.useStaticAssets(join(process.cwd(), 'uploads', 'reports'), {
     prefix: '/tankcertificate/uploads/reports/',
   });
-
-   // Serve static files for the main uploads directory (for MSDS and other files)
   app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
 
-  await app.listen(8000); // Bill of Lading API available
+  // 🔑 Register the context interceptor globally (required for audit logs)
+  app.useGlobalInterceptors(new ContextInterceptor());
+
+  await app.listen(8000);
 }
 bootstrap();

@@ -12,6 +12,7 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { AlertTriangle, X } from "lucide-react";
+import { apiFetch } from "../../lib/api";
 
 const AddQuotationModal = ({
   onClose,
@@ -147,36 +148,23 @@ const AddQuotationModal = ({
     };
 
     try {
-      const method = form.id ? "PATCH" : "POST";
-      const url = form.id
-        ? `http://localhost:8000/quotations/${form.id}`
-        : "http://localhost:8000/quotations";
+  const isUpdate = Boolean(form.id);
+  const url = isUpdate
+    ? `http://localhost:8000/quotations/${form.id}`
+    : 'http://localhost:8000/quotations';
 
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+  const result = await apiFetch(url, {
+    method: isUpdate ? 'PATCH' : 'POST',
+    body: payload, // 👈 plain object allowed now
+  });
 
-      if (!res.ok) throw new Error("Failed to save quotation");
-
-      const result = await res.json();
-      
-      // Show success alert
-      if (form.id) {
-        alert('Quotation updated successfully!');
-      } else {
-        alert('Quotation created successfully!');
-      }
-      
-      fetchQuotations?.(); // Optional: Refresh parent data
-      onClose();
-    } catch (err) {
-      console.error("Error submitting quotation:", err);
-      alert('Failed to save quotation. Please try again.');
-    }
+  alert(isUpdate ? 'Quotation updated successfully!' : 'Quotation created successfully!');
+  fetchQuotations?.();
+  onClose();
+} catch (err: any) {
+  console.error('Error submitting quotation:', err);
+  alert(`Failed to save quotation. ${err?.message ? `Details: ${err.message}` : 'Please try again.'}`);
+}
   };
 
   useEffect(() => {

@@ -40,6 +40,7 @@ import {
 } from "@/components/ui/select";
 import { generateCroPdf } from './generateCroPdf';
 import { generateBlPdf, type BLType, type BLFormData } from './generateBlPdf';
+import { apiFetch } from '../../../lib/api';
 
 // Extended BL form data interface to include all form fields
 interface ExtendedBLFormData extends BLFormData {
@@ -509,7 +510,9 @@ const AllShipmentsPage = () => {
     if (!confirmDelete) return;
 
     try {
-      await axios.delete(`http://localhost:8000/shipment/${id}`);
+      await apiFetch(`http://localhost:8000/shipment/${id}`, {
+        method: 'DELETE',
+      });
       await fetchShipments();
     } catch (err) {
       console.error('Failed to delete shipment', err);

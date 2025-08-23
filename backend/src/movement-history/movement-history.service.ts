@@ -180,41 +180,41 @@ export class MovementHistoryService {
   }
 
   async bulkUpdateStatus(
-    ids: number[],
-    newStatus: string,
-    jobNumber: string,
-    remarks?: string,
-    vesselName?: string,
-    addressBookIdFromFrontend?: number,
-  ) {
-    const shipment = await this.prisma.shipment.findFirst({
-      where: { jobNumber },
-      include: {
-        polPort: true,
-        podPort: true,
-        carrierAddressBook: true,
-      },
-    });
+  ids: number[],
+  newStatus: string,
+  jobNumber: string,
+  remarks?: string,
+  vesselName?: string,
+  addressBookIdFromFrontend?: number,
+) {
+  const shipment = await this.prisma.shipment.findFirst({
+    where: { jobNumber },
+    include: {
+      polPort: true,
+      podPort: true,
+      carrierAddressBook: true,
+    },
+  });
 
-    const emptyRepoJob = !shipment
-      ? await this.prisma.emptyRepoJob.findFirst({
-          where: { jobNumber },
-          select: {
-            id: true,
-            polPortId: true,
-            podPortId: true,
-            carrierAddressBookId: true,
-            emptyReturnDepotAddressBookId: true,
-          },
-        })
-      : null;
+  const emptyRepoJob = !shipment
+    ? await this.prisma.emptyRepoJob.findFirst({
+        where: { jobNumber },
+        select: {
+          id: true,
+          polPortId: true,
+          podPortId: true,
+          carrierAddressBookId: true,
+          emptyReturnDepotAddressBookId: true,
+        },
+      })
+    : null;
 
-    const status = newStatus.toUpperCase();
+  const status = newStatus.toUpperCase();
 
-    const tasks = ids.map(async (id) => {
-      const prev = await this.prisma.movementHistory.findUnique({
-        where: { id },
-      });
+  // Step 1: Precompute transition data outside of the transaction
+  const movementsData = await Promise.all(
+    ids.map(async (id) => {
+      const prev = await this.prisma.movementHistory.findUnique({ where: { id } });
       if (!prev) throw new NotFoundException(`MovementHistory ${id} not found`);
 
       const {
@@ -233,23 +233,28 @@ export class MovementHistoryService {
         vesselName,
       );
 
-      return this.prisma.movementHistory.create({
-        data: {
-          inventoryId: prev.inventoryId,
-          shipmentId: prev.shipmentId ?? shipment?.id ?? null,
-          emptyRepoJobId: prev.emptyRepoJobId ?? emptyRepoJob?.id ?? null,
-          portId,
-          addressBookId,
-          status: finalStatus,
-          date: new Date(),
-          remarks: finalRemarks,
-          vesselName: finalVesselName,
-        },
-      });
-    });
+      return {
+        inventoryId: prev.inventoryId,
+        shipmentId: prev.shipmentId ?? shipment?.id ?? null,
+        emptyRepoJobId: prev.emptyRepoJobId ?? emptyRepoJob?.id ?? null,
+        portId,
+        addressBookId,
+        status: finalStatus,
+        date: new Date(),
+        remarks: finalRemarks,
+        vesselName: finalVesselName,
+      };
+    })
+  );
 
-    return this.prisma.$transaction(tasks as any);
-  }
+  // Step 2: Run only pure Prisma calls inside the transaction
+  return this.prisma.$transaction(
+    movementsData.map((data) =>
+      this.prisma.movementHistory.create({ data })
+    )
+  );
+}
+
 
   async updateMovement(id: number, data: Partial<MovementHistory>) {
     const updatedData = {

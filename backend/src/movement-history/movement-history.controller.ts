@@ -6,9 +6,11 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { MovementHistoryService } from './movement-history.service';
 import { BulkUpdateMovementDto } from './dto/bulk-update-movement.dto';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('movement-history')
 export class MovementHistoryController {
@@ -39,10 +41,9 @@ getLatestPerContainer() {
   }
 
 
+   @UseGuards(AuthGuard('jwt'))
   @Post('bulk-create')
-  
   async bulkCreateStatus(
-    
     @Body()
     body: {
       ids: number[];
@@ -74,6 +75,7 @@ getLatestPerContainer() {
     return { message: 'New status entries created', results };
   }
 
+    @UseGuards(AuthGuard('jwt'))
   @Post('bulk-update')
   async bulkUpdate(
     @Body() dto: { ids: number[]; newStatus: string; jobNumber: string; remarks:string , vesselName?: string },
@@ -88,6 +90,7 @@ getLatestPerContainer() {
     );
   }
 
+    @UseGuards(AuthGuard('jwt'))
   @Patch(':id')
   updateMovement(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
     return this.movementHistoryService.updateMovement(id, body);

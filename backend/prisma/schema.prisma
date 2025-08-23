@@ -609,3 +609,45 @@ model BillofLading {
   shipment               Shipment? @relation(fields: [shipmentId], references: [id])
  
 }
+
+// ---------- Audit logging ----------
+
+enum AuditAction {
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGOUT
+  CREATE
+  UPDATE
+  DELETE
+  UPSERT
+  BULK_UPDATE
+  BULK_DELETE
+  PERMISSION_CHANGE
+}
+
+model AuditLog {
+  id          String      @id @default(cuid())
+  ts          DateTime    @default(now())
+  requestId   String?
+
+  actorId     String?
+  actorEmail  String?
+  actorRole   String?
+
+  action      AuditAction
+  entity      String
+  entityId    String?
+
+  oldValues   Json?
+  newValues   Json?
+
+  ip          String?
+  userAgent   String?
+  meta        Json?
+
+  @@index([ts])
+  @@index([entity, entityId])
+  @@index([actorId])
+  @@index([action])
+}
+

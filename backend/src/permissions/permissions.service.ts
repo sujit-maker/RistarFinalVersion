@@ -44,7 +44,7 @@ async getPermissions(userId: number) {
       where: { userId },
     });
   }
-// permissions.service.ts
+  
 async getPermissionsByUser(userId: number, module: string) {
   return this.prisma.permission.findFirst({
     where: { userId, module },

@@ -17,6 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { apiFetch } from '../../../lib/api';
 
 const EmptyRepo = () => {
   const [showModal, setShowModal] = useState(false);
@@ -86,7 +87,9 @@ const EmptyRepo = () => {
     if (!confirmDelete) return;
 
     try {
-      await axios.delete(`http://localhost:8000/empty-repo-job/${id}`);
+      await apiFetch(`http://localhost:8000/empty-repo-job/${id}`, {
+        method: 'DELETE',
+      });
       await fetchEmptyRepoJobs();
     } catch (err) {
       console.error('Failed to delete empty repo job', err);

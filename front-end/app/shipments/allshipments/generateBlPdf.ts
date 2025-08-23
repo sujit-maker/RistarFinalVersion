@@ -790,13 +790,12 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
         doc.line(tableX + col1Width + col2Width, totalRowY, tableX + col1Width + col2Width, totalRowY + 12);
         doc.line(tableX + col1Width + col2Width + col3Width, totalRowY, tableX + col1Width + col2Width + col3Width, totalRowY + 12);
         
-        // Total row data
-        doc.setFont('arial', 'bold');
-        doc.text('TOTAL', cell1CenterX, totalRowY + 8, { align: 'center' });
-        doc.text(`${totalGrossWt.toFixed(2)} KGS`, cell2CenterX, totalRowY + 8, { align: 'center' });
-        doc.text(`${totalNetWt.toFixed(2)} KGS`, cell3CenterX, totalRowY + 8, { align: 'center' });
-        // Leave seal no total field empty as requested
-        doc.text('', tableX + col1Width + col2Width + col3Width + 2, totalRowY + 8);
+       doc.setFont('arial', 'bold');
+         doc.text(`TOTAL: ${containersToShow.length} CONTAINERS`, cell1CenterX, totalRowY + 8, { align: 'center' });
+         doc.text(`${totalGrossWt.toFixed(2)} KGS`, cell2CenterX, totalRowY + 8, { align: 'center' });
+         doc.text(`${totalNetWt.toFixed(2)} KGS`, cell3CenterX, totalRowY + 8, { align: 'center' });
+         // Leave seal no total field empty as requested
+         doc.text('', tableX + col1Width + col2Width + col3Width + 2, totalRowY + 8);
         
         containerY += 12; // Update containerY after total row
       }

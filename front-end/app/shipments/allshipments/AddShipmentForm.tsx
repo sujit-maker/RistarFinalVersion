@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Plus, AlertTriangle, X } from "lucide-react";
+import { apiFetch } from "../../../lib/api";
 
 type Option = { id: string | number; name: string };
 type ProductOption = {
@@ -1307,12 +1308,16 @@ const AddShipmentModal = ({
 
       if (form.id) {
         // For PATCH (Edit)
-        await axios.patch(`http://localhost:8000/shipment/${form.id}`, payload);
-        alert("Shipment updated successfully!");
+await apiFetch(`http://localhost:8000/shipment/${form.id}`, {
+  method: 'PATCH',
+  body: JSON.stringify(payload),
+});        alert("Shipment updated successfully!");
       } else {
         // For POST (New)
-        await axios.post("http://localhost:8000/shipment", payload);
-        alert("Shipment created successfully!");
+       await apiFetch('http://localhost:8000/shipment', {
+  method: 'POST',
+  body: JSON.stringify(payload),
+});
       }
 
       if (refreshShipments) refreshShipments(); // Refresh parent
