@@ -1308,16 +1308,17 @@ const AddShipmentModal = ({
 
       if (form.id) {
         // For PATCH (Edit)
-await apiFetch(`http://localhost:8000/shipment/${form.id}`, {
-  method: 'PATCH',
-  body: JSON.stringify(payload),
-});        alert("Shipment updated successfully!");
+        await apiFetch(`http://localhost:8000/shipment/${form.id}`, {
+          method: 'PATCH',
+          body: payload,
+        });
+        alert("Shipment updated successfully!");
       } else {
         // For POST (New)
-       await apiFetch('http://localhost:8000/shipment', {
-  method: 'POST',
-  body: JSON.stringify(payload),
-});
+        await apiFetch('http://localhost:8000/shipment', {
+          method: 'POST',
+          body: payload,
+        });
       }
 
       if (refreshShipments) refreshShipments(); // Refresh parent
@@ -1426,9 +1427,14 @@ await apiFetch(`http://localhost:8000/shipment/${form.id}`, {
         });
       }
 
-      const shippingTerm = data.shippingTerm
-        ? [{ id: data.shippingTerm, name: data.shippingTerm }]
-        : [];
+      // Preserve existing shipping terms and add the imported one if it doesn't exist
+      const existingShippingTerms = selectOptions.shippingTerm || [];
+      const importedShippingTerm = data.shippingTerm ? { id: data.shippingTerm, name: data.shippingTerm } : null;
+      
+      let updatedShippingTerms = [...existingShippingTerms];
+      if (importedShippingTerm && !existingShippingTerms.find(term => term.id === importedShippingTerm.id)) {
+        updatedShippingTerms.push(importedShippingTerm);
+      }
 
       setSelectOptions({
         customer,
@@ -1436,7 +1442,7 @@ await apiFetch(`http://localhost:8000/shipment/${form.id}`, {
         port,
         agent,
         depot,
-        shippingTerm,
+        shippingTerm: updatedShippingTerms,
       });
 
       // FIX: First set the form with basic data - properly set customer display name
@@ -1908,15 +1914,8 @@ await apiFetch(`http://localhost:8000/shipment/${form.id}`, {
                           setValidationErrors(prev => ({...prev, shippingTerm: ""}));
                         }
                       }}
-                      disabled={!!form.quotationRefNo}
                     >
-                      <SelectTrigger
-                        className={`w-full p-2 bg-white text-gray-900 dark:bg-neutral-800 dark:text-white rounded border border-neutral-200 dark:border-neutral-700 ${
-                          form.quotationRefNo
-                            ? "cursor-not-allowed opacity-75"
-                            : ""
-                        }`}
-                      >
+                      <SelectTrigger className="w-full p-2 bg-white text-gray-900 dark:bg-neutral-800 dark:text-white rounded border border-neutral-200 dark:border-neutral-700">
                         <SelectValue placeholder="Select Shipping Term" />
                       </SelectTrigger>
                       <SelectContent className="text-sm text-gray-900 dark:text-white">
@@ -1931,6 +1930,8 @@ await apiFetch(`http://localhost:8000/shipment/${form.id}`, {
                       <p className="text-red-500 text-xs mt-1">{validationErrors.shippingTerm}</p>
                     )}
                   </div>
+
+
                   <div className="relative">
                     <Label
                       htmlFor="customerName"

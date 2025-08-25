@@ -44,7 +44,7 @@ async create(data: CreateShipmentDto) {
   const paddedSequence = String(nextSequence).padStart(5, '0');
   const generatedHouseBL = `${prefix}${paddedSequence}`;
 
-  const { containers, ...shipmentData } = data;
+  const { containers, ...otherData } = data;
 
   const parseDate = (d: string | Date | undefined) =>
     d ? new Date(d).toISOString() : new Date().toISOString();
@@ -55,7 +55,7 @@ async create(data: CreateShipmentDto) {
   return this.prisma.$transaction(async (tx) => {
     // Build the data object conditionally
     const shipmentData: any = {
-      ...data, // This spreads all the other fields
+      ...otherData, // This spreads all the other fields
       houseBL: generatedHouseBL,
       jobNumber: generatedJobNumber,
       date: parseDate(data.date),

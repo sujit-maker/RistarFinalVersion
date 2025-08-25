@@ -746,8 +746,10 @@ const AllShipmentsPage = () => {
         : new Date().toISOString().split('T')[0];
 
       // Mark CRO as generated and capture first generation date if not already done
-      const response = await axios.post(`http://localhost:8000/shipment/mark-cro-generated/${croFormData.shipmentId}`);
-      const updatedShipment = response.data;
+      const response = await apiFetch(`http://localhost:8000/shipment/mark-cro-generated/${croFormData.shipmentId}`, {
+        method: 'POST',
+      });
+      const updatedShipment = response;
 
       // Update CRO generation status
       setCroGenerationStatus(prev => ({

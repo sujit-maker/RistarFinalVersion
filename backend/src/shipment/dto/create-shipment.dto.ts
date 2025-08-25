@@ -13,9 +13,11 @@ class ShipmentContainerDto {
   @IsString()
   tare: string;
 
+  @IsOptional()
   @IsInt()
-  inventoryId: number;
+  inventoryId?: number;
 
+  @IsOptional()
   @IsInt()
   portId?: number;
 
@@ -46,11 +48,13 @@ export class CreateShipmentDto {
   @IsInt()
   productId: number;
 
+  @IsOptional()
   @IsInt()
-  consigneeAddressBookId: number;
+  consigneeAddressBookId?: number;
 
+  @IsOptional()
   @IsInt()
-  shipperAddressBookId: number;
+  shipperAddressBookId?: number;
 
   @IsInt()
   polPortId: number;
@@ -70,8 +74,9 @@ export class CreateShipmentDto {
   @IsString()
   podDetentionRate: string;
 
+  @IsOptional()
   @IsInt()
-  transhipmentPortId: number;
+  transhipmentPortId?: number;
 
   @IsInt()
   expHandlingAgentAddressBookId: number;
@@ -82,17 +87,11 @@ export class CreateShipmentDto {
   @IsString()
   quantity: string;
 
-  @IsString()
-  containerNumber: string;
 
-  @IsString()
-  capacity: string;
 
-  @IsString()
-  tare: string;
-
+  @IsOptional()
   @IsInt()
-  carrierAddressBookId: number;
+  carrierAddressBookId?: number;
 
   @IsString()
   vesselName: string;
