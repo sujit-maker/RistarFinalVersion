@@ -1023,13 +1023,17 @@ const AllShipmentsPage = () => {
   // Handle saving BL form data
   const handleSaveBlData = async () => {
     try {
-      // Debug: Log the current form data to see what we're sending
-      console.log('Current blFormData before save:', blFormData);
-      console.log('Individual container data:', blFormData.containers);
-      console.log('Aggregated grossWt:', blFormData.grossWt);
-      console.log('Aggregated netWt:', blFormData.netWt);
-      console.log('Aggregated sealNo:', blFormData.sealNo);
-      console.log('Aggregated containerNos:', blFormData.containerNos);
+      // Check if BL already exists to determine if this is create or update
+      let isExistingBl = false;
+      try {
+        const existingBlResponse = await axios.get(`http://localhost:8000/bill-of-lading/shipment/${blFormData.shipmentId}`);
+        isExistingBl = !!existingBlResponse.data;
+      } catch (error) {
+        // If error, BL doesn't exist, so this is a create operation
+        isExistingBl = false;
+      }
+
+      
 
       // Create the payload without shipmentId for the new endpoint
       const blPayload = {
@@ -1091,10 +1095,14 @@ const AllShipmentsPage = () => {
       alert(`${currentBlType === 'original' ? 'Original' : currentBlType === 'draft' ? 'Draft' : 'Seaway'} Bill of Lading saved successfully!`);
       setBlJustSaved(true); // Show download button and enable update mode
       
-      // Close the modal after a short delay to allow user to see the success message
-      setTimeout(() => {
-        setShowBlModal(false);
-      }, 1000);
+      // Only close the modal if this was an update (not a new creation)
+      if (isExistingBl) {
+        // Close the modal after a short delay to allow user to see the success message
+        setTimeout(() => {
+          setShowBlModal(false);
+        }, 1000);
+      }
+      // If it's a new creation, keep the modal open so user can continue editing
     } catch (error) {
       console.error('Error saving Bill of Lading:', error);
       alert('Error saving Bill of Lading. Please try again.');
@@ -1424,6 +1432,18 @@ const AllShipmentsPage = () => {
       };
       
       await generateBlPdf(blType, pdfData, blDataWithCurrentContainers, 0); // 0 = original copy
+      
+      // Update BL generation status for direct downloads so copy options appear
+      if (blType === 'original') {
+        setBlGenerationStatus(prev => ({
+          ...prev,
+          [shipmentId]: {
+            ...prev[shipmentId],
+            hasOriginalBLGenerated: true,
+            firstGenerationDate: existingBl.firstGenerationDate || new Date().toISOString()
+          }
+        }));
+      }
       
     } catch (error) {
       console.error('Error downloading BL PDF directly:', error);
@@ -2072,7 +2092,7 @@ const AllShipmentsPage = () => {
                   className="bg-gray-100 cursor-not-allowed"
                 />
               </div>
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label htmlFor="shipmentIdDisplay">Shipment ID</Label>
                 <Input
                   id="shipmentIdDisplay"
@@ -2080,7 +2100,7 @@ const AllShipmentsPage = () => {
                   disabled
                   className="bg-gray-100 cursor-not-allowed"
                 />
-              </div>
+              </div> */}
             </div>
             {/* Shipper Information */}
             <hr className="dark:border-black  "/>
