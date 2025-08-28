@@ -567,10 +567,12 @@ model BillofLading {
   consigneeAddress       String?
   consigneeContactNo     String?
   consigneeEmail         String?
+  consigneeInfo          String?
   notifyPartyName        String
   notifyPartyAddress     String?
   notifyPartyContactNo   String?
   notifyPartyEmail       String?
+  notifyPartyInfo        String?
   containerNos           String?
   sealNo                 String
   grossWt                String
@@ -582,24 +584,18 @@ model BillofLading {
   Vat                    String?
   deliveryAgentContactNo String?
   deliveryAgentEmail     String?
+  deliveryAgentInfo      String?
   freightAmount          String?
   shippersAddress        String?
   shippersContactNo      String?
   shippersEmail          String?
   shippersName           String
+  shipperInfo            String?
   portOfLoading          String?
   portOfDischarge        String?
   vesselNo               String?
-  securityDeposit        String?
-  loloCharges            String?
-  Orc                    String?
-  inspectionFees         String?
-  reeferPlugInCharges    String?
-  specialGearCharges     String?
-  riyadhDestinedContainerShifting  String?
-  xRayChargesForRiyadhShifting  String?
-  lineDetection  String?
-  damageRepairCleaningCharges  String?
+  chargesAndFees         String?
+  date                   String? // BL issued date (editable by user)
   createdAt              DateTime  @default(now())
   shipmentId             Int?
   updatedAt              DateTime  @default(now()) @updatedAt

@@ -21,6 +21,10 @@ export class CreateBillOfLadingDto {
   @IsString()
   shippersEmail?: string;
 
+  @IsOptional()
+  @IsString()
+  shipperInfo?: string;
+
   @IsNotEmpty()
   @IsString()
   consigneeName: string;
@@ -37,6 +41,10 @@ export class CreateBillOfLadingDto {
   @IsString()
   consigneeEmail?: string;
 
+  @IsOptional()
+  @IsString()
+  consigneeInfo?: string;
+
   @IsNotEmpty()
   @IsString()
   notifyPartyName: string;
@@ -52,6 +60,10 @@ export class CreateBillOfLadingDto {
   @IsOptional()
   @IsString()
   notifyPartyEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  notifyPartyInfo?: string;
 
   @IsNotEmpty()
   @IsString()
@@ -95,6 +107,10 @@ export class CreateBillOfLadingDto {
 
   @IsOptional()
   @IsString()
+  deliveryAgentInfo?: string;
+
+  @IsOptional()
+  @IsString()
   freightAmount?: string;
 
   @IsOptional()
@@ -111,43 +127,11 @@ export class CreateBillOfLadingDto {
 
   @IsOptional()
   @IsString()
-  securityDeposit?: string;
+  chargesAndFees?: string;
 
   @IsOptional()
   @IsString()
-  loloCharges?: string;
-
-  @IsOptional()
-  @IsString()
-  Orc?: string;
-
-  @IsOptional()
-  @IsString()
-  inspectionFees?: string;
-
-  @IsOptional()
-  @IsString()
-  reeferPlugInCharges?: string;
-
-  @IsOptional()
-  @IsString()
-  specialGearCharges?: string;
-
-  @IsOptional()
-  @IsString()
-  riyadhDestinedContainerShifting?: string;
-
-  @IsOptional()
-  @IsString()
-  xRayChargesForRiyadhShifting?: string;
-
-  @IsOptional()
-  @IsString()
-  lineDetection?: string;
-
-  @IsOptional()
-  @IsString()
-  damageRepairCleaningCharges?: string;
+  date?: string;
 
   @IsOptional()
   @IsBoolean()

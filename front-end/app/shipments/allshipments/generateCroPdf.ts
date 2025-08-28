@@ -557,12 +557,12 @@ export async function generateCroPdf(
         
         // Add hazardous status below TANK PREP value
         const hazardousStatus = productType === 'Hazardous' ? 'Hazardous' : 'Non-Hazardous';
-        addTextWithSpacing(doc, "Hazardous/Non-Hazardous:", hazardousStatus, 14, shipmentDetailsStartY + 30, 45);
+        addTextWithSpacing(doc, "PRODUCT TYPE:", hazardousStatus, 14, shipmentDetailsStartY + 30, 45);
 
         // --- RIGHT COLUMN SHIPMENT DETAILS ---
         addTextWithSpacing(doc, "CLOSING DATE/TIME:", "00:00:00", 120, shipmentDetailsStartY, 50);
             // Add product name below POD value
-        addTextWithSpacing(doc, "Product Name:", productName, 120, shipmentDetailsStartY + 6, 50);
+        addTextWithSpacing(doc, "PRODUCT NAME:", productName, 120, shipmentDetailsStartY + 6, 50);
         addTextWithSpacing(doc, "POD:", groupPod, 120, shipmentDetailsStartY + 12, 50);
         
   

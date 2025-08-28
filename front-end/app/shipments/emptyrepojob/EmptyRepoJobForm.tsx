@@ -322,7 +322,7 @@ const AddShipmentModal = ({
           `http://localhost:8000/empty-repo-job/${form.id}`,
           {
             method: 'PATCH',
-            body: JSON.stringify(payload),
+            body: payload,
           }
         );
         alert("Empty repo job updated successfully!");
@@ -330,7 +330,7 @@ const AddShipmentModal = ({
         // For POST (New)
         await apiFetch("http://localhost:8000/empty-repo-job", {
           method: 'POST',
-          body: JSON.stringify(payload),
+          body: payload,
         });
         alert("Empty repo job created successfully!");
       }

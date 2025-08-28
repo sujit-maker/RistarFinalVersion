@@ -21,7 +21,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     const checkExistingToken = () => {
-      const token = localStorage.getItem('access_token') || sessionStorage.getItem('token');
+      const token = localStorage.getItem('access_token');
       
       if (!token) {
         return; // No token, stay on login page

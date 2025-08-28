@@ -48,18 +48,22 @@ interface ExtendedBLFormData extends BLFormData {
   shippersAddress: string;
   shippersContactNo: string;
   shippersEmail: string;
+  shipperInfo: string; // Combined field
   consigneeName: string;
   consigneeAddress: string;
   consigneeContactNo: string;
   consigneeEmail: string;
+  consigneeInfo: string; // Combined field
   notifyPartyName: string;
   notifyPartyAddress: string;
   notifyPartyContactNo: string;
   notifyPartyEmail: string;
+  notifyPartyInfo: string; // Combined field
   deliveryAgentName: string;
   deliveryAgentAddress: string;
   deliveryAgentContactNo: string;
   deliveryAgentEmail: string;
+  deliveryAgentInfo: string; // Combined field
   sealNo: string;
   grossWt: string;
   netWt: string;
@@ -67,16 +71,7 @@ interface ExtendedBLFormData extends BLFormData {
   freightPayableAt: string;
   freightAmount: string;
   Vat: string;
-  securityDeposit: string;
-  loloCharges: string;
-  Orc: string;
-  inspectionFees: string;
-  reeferPlugInCharges: string;
-  specialGearCharges: string;
-  riyadhDestinedContainerShifting: string;
-  xRayChargesForRiyadhShifting: string;
-  lineDetection: string;
-  damageRepairCleaningCharges: string;
+  chargesAndFees: string;
   shipmentId: number;
   blType: BLType;
 }
@@ -88,18 +83,22 @@ interface CompleteBLFormData {
   shippersAddress: string;
   shippersContactNo: string;
   shippersEmail: string;
+  shipperInfo: string;
   consigneeName: string;
   consigneeAddress: string;
   consigneeContactNo: string;
   consigneeEmail: string;
+  consigneeInfo: string;
   notifyPartyName: string;
   notifyPartyAddress: string;
   notifyPartyContactNo: string;
   notifyPartyEmail: string;
+  notifyPartyInfo: string;
   deliveryAgentName: string;
   deliveryAgentAddress: string;
   deliveryAgentContactNo: string;
   deliveryAgentEmail: string;
+  deliveryAgentInfo: string;
   sealNo: string;
   grossWt: string;
   netWt: string;
@@ -107,16 +106,7 @@ interface CompleteBLFormData {
   freightPayableAt: string;
   freightAmount: string;
   Vat: string;
-  securityDeposit: string;
-  loloCharges: string;
-  Orc: string;
-  inspectionFees: string;
-  reeferPlugInCharges: string;
-  specialGearCharges: string;
-  riyadhDestinedContainerShifting: string;
-  xRayChargesForRiyadhShifting: string;
-  lineDetection: string;
-  damageRepairCleaningCharges: string;
+  chargesAndFees: string;
 }
 
 interface Shipment {
@@ -125,6 +115,7 @@ interface Shipment {
 }
 
 const AllShipmentsPage = () => {
+
   const [showModal, setShowModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewShipment, setViewShipment] = useState<any>(null);
@@ -179,14 +170,17 @@ const AllShipmentsPage = () => {
     shippersAddress: '',
     shippersContactNo: '',
     shippersEmail: '',
+    shipperInfo: '', // Combined field
     consigneeName: '',
     consigneeAddress: '',
     consigneeContactNo: '',
     consigneeEmail: '',
+    consigneeInfo: '', // Combined field
     notifyPartyName: '',
     notifyPartyAddress: '',
     notifyPartyContactNo: '',
     notifyPartyEmail: '',
+    notifyPartyInfo: '', // Combined field
     containerNos: '',
     sealNo: '',
     grossWt: '',
@@ -198,18 +192,10 @@ const AllShipmentsPage = () => {
     Vat: '',
     deliveryAgentContactNo: '',
     deliveryAgentEmail: '',
+    deliveryAgentInfo: '', // Combined field
     freightAmount: '',
-    // Default values for charge fields as shown in the image
-    securityDeposit: 'SAR 3000 per dry container & SAR 7,000 per Reefer/Flat rack/special equipment',
-    loloCharges: 'SAR 100/150 + VAT',
-    Orc: 'SAR 300/450/560 per 20/40/45 for NON-DG and SAR375/562.50/700 per 20′/40′/45′ for DG respectively.',
-    inspectionFees: 'SAR 140 per container',
-    reeferPlugInCharges: 'SAR 134/day per reefer',
-    specialGearCharges: 'SAR 300 per unit for OOG',
-    riyadhDestinedContainerShifting: 'SAR 60 per unit',
-    xRayChargesForRiyadhShifting: 'SAR 460/560 (20′/40′)',
-    lineDetection: 'As per MAWANI regulation article 28/02',
-    damageRepairCleaningCharges: 'as per actual, if any.',
+    // Empty charges and fees field by default
+    chargesAndFees: '',
     // Fields fetched from shipment
     portOfLoading: '',
     portOfDischarge: '',
@@ -741,7 +727,7 @@ const AllShipmentsPage = () => {
     try {
       // Get the consistent date from generation status or use current date as fallback
       const generationStatus = croGenerationStatus[croFormData.shipmentId];
-      const consistentDate = generationStatus?.firstCroGenerationDate 
+      const formDate = generationStatus?.firstCroGenerationDate 
         ? new Date(generationStatus.firstCroGenerationDate).toISOString().split('T')[0]
         : new Date().toISOString().split('T')[0];
 
@@ -756,12 +742,12 @@ const AllShipmentsPage = () => {
         ...prev,
         [croFormData.shipmentId]: {
           hasCroGenerated: updatedShipment.hasCroGenerated || true,
-          firstCroGenerationDate: updatedShipment.firstCroGenerationDate || consistentDate
+          firstCroGenerationDate: updatedShipment.firstCroGenerationDate || formDate
         }
       }));
 
       // Generate PDF with consistent date
-      await generateCroPdf(croFormData.shipmentId, croFormData.containers, consistentDate);
+      await generateCroPdf(croFormData.shipmentId, croFormData.containers, formDate);
       setShowCroModal(false);
     } catch (error) {
       console.error('Error generating CRO PDF:', error);
@@ -813,31 +799,26 @@ const AllShipmentsPage = () => {
           netWt: savedNetWeights[index] || ''
         }));
 
-        // Get the consistent date from generation status
-        const generationStatus = blGenerationStatus[shipment.id];
-        const consistentDate = generationStatus?.firstGenerationDate 
-          ? new Date(generationStatus.firstGenerationDate).toISOString().split('T')[0]
-          : existingBl.firstGenerationDate
-          ? new Date(existingBl.firstGenerationDate).toISOString().split('T')[0]
-          : new Date().toISOString().split('T')[0];
-
         setBlFormData({
           shipmentId: shipment.id,
           blType: blType,
-          date: consistentDate, // Set consistent date
+          date: existingBl.date || new Date().toISOString().split('T')[0], // Use saved date or current date
           // Fill with existing BL data for other fields
           shippersName: existingBl.shippersName || '',
           shippersAddress: existingBl.shippersAddress || '',
           shippersContactNo: existingBl.shippersContactNo || '',
           shippersEmail: existingBl.shippersEmail || '',
+          shipperInfo: existingBl.shipperInfo || '',
           consigneeName: existingBl.consigneeName || '',
           consigneeAddress: existingBl.consigneeAddress || '',
           consigneeContactNo: existingBl.consigneeContactNo || '',
           consigneeEmail: existingBl.consigneeEmail || '',
+          consigneeInfo: existingBl.consigneeInfo || '',
           notifyPartyName: existingBl.notifyPartyName || '',
           notifyPartyAddress: existingBl.notifyPartyAddress || '',
           notifyPartyContactNo: existingBl.notifyPartyContactNo || '',
           notifyPartyEmail: existingBl.notifyPartyEmail || '',
+          notifyPartyInfo: existingBl.notifyPartyInfo || '',
           // Always use the SNAPSHOT container list from the first generation
           containerNos: currentContainers.map((c: any) => c.containerNumber).join(', '),
           sealNo: existingBl.sealNo || '',
@@ -850,18 +831,10 @@ const AllShipmentsPage = () => {
           Vat: existingBl.Vat || '',
           deliveryAgentContactNo: existingBl.deliveryAgentContactNo || '',
           deliveryAgentEmail: existingBl.deliveryAgentEmail || '',
+          deliveryAgentInfo: existingBl.deliveryAgentInfo || '',
           freightAmount: existingBl.freightAmount || '',
-          // Charge fields with existing values or defaults
-          securityDeposit: existingBl.securityDeposit || 'SAR 3000 per dry container & SAR 7,000 per Reefer/Flat rack/special equipment',
-          loloCharges: existingBl.loloCharges || 'SAR 100/150 + VAT',
-          Orc: existingBl.Orc || 'SAR 300/450/560 per 20/40/45 for NON-DG and SAR375/562.50/700 per 20′/40′/45′ for DG respectively.',
-          inspectionFees: existingBl.inspectionFees || 'SAR 140 per container',
-          reeferPlugInCharges: existingBl.reeferPlugInCharges || 'SAR 134/day per reefer',
-          specialGearCharges: existingBl.specialGearCharges || 'SAR 300 per unit for OOG',
-          riyadhDestinedContainerShifting: existingBl.riyadhDestinedContainerShifting || 'SAR 60 per unit',
-          xRayChargesForRiyadhShifting: existingBl.xRayChargesForRiyadhShifting || 'SAR 460/560 (20′/40′)',
-          lineDetection: existingBl.lineDetection || 'As per MAWANI regulation article 28/02',
-          damageRepairCleaningCharges: existingBl.damageRepairCleaningCharges || 'as per actual, if any.',
+          // Charges and fees field with existing value or empty
+          chargesAndFees: existingBl.chargesAndFees || '',
           // Prefer saved BL snapshot values; fall back to latest shipment only if missing
           portOfLoading: existingBl.portOfLoading || latestShipment.polPort?.portName || '',
           portOfDischarge: existingBl.portOfDischarge || latestShipment.podPort?.portName || '',
@@ -892,14 +865,17 @@ const AllShipmentsPage = () => {
           shippersAddress: '',
           shippersContactNo: '',
           shippersEmail: '',
+          shipperInfo: '',
           consigneeName: '',
           consigneeAddress: '',
           consigneeContactNo: '',
           consigneeEmail: '',
+          consigneeInfo: '',
           notifyPartyName: '',
           notifyPartyAddress: '',
           notifyPartyContactNo: '',
           notifyPartyEmail: '',
+          notifyPartyInfo: '',
           containerNos: latestShipment.containers?.map((c: any) => c.containerNumber).join(', ') || '',
           sealNo: '',
           grossWt: '',
@@ -911,18 +887,10 @@ const AllShipmentsPage = () => {
           Vat: '',
           deliveryAgentContactNo: '',
           deliveryAgentEmail: '',
+          deliveryAgentInfo: '',
           freightAmount: '',
-          // Default values for charge fields
-          securityDeposit: 'SAR 3000 per dry container & SAR 7,000 per Reefer/Flat rack/special equipment',
-          loloCharges: 'SAR 100/150 + VAT',
-          Orc: 'SAR 300/450/560 per 20/40/45 for NON-DG and SAR375/562.50/700 per 20′/40′/45′ for DG respectively.',
-          inspectionFees: 'SAR 140 per container',
-          reeferPlugInCharges: 'SAR 134/day per reefer',
-          specialGearCharges: 'SAR 300 per unit for OOG',
-          riyadhDestinedContainerShifting: 'SAR 60 per unit',
-          xRayChargesForRiyadhShifting: 'SAR 460/560 (20′/40′)',
-          lineDetection: 'As per MAWANI regulation article 28/02',
-          damageRepairCleaningCharges: 'as per actual, if any.',
+          // Empty charges and fees field by default
+          chargesAndFees: '',
           // Fields fetched from LATEST shipment data
           portOfLoading: latestShipment.polPort?.portName || '',
           portOfDischarge: latestShipment.podPort?.portName || '',
@@ -956,14 +924,17 @@ const AllShipmentsPage = () => {
           shippersAddress: '',
           shippersContactNo: '',
           shippersEmail: '',
+          shipperInfo: '',
           consigneeName: '',
           consigneeAddress: '',
           consigneeContactNo: '',
           consigneeEmail: '',
+          consigneeInfo: '',
           notifyPartyName: '',
           notifyPartyAddress: '',
           notifyPartyContactNo: '',
           notifyPartyEmail: '',
+          notifyPartyInfo: '',
           containerNos: latestShipment.containers?.map((c: any) => c.containerNumber).join(', ') || '',
           sealNo: '',
           grossWt: '',
@@ -975,18 +946,10 @@ const AllShipmentsPage = () => {
           Vat: '',
           deliveryAgentContactNo: '',
           deliveryAgentEmail: '',
+          deliveryAgentInfo: '',
           freightAmount: '',
-          // Default values for charge fields
-          securityDeposit: 'SAR 3000 per dry container & SAR 7,000 per Reefer/Flat rack/special equipment',
-          loloCharges: 'SAR 100/150 + VAT',
-          Orc: 'SAR 300/450/560 per 20/40/45 for NON-DG and SAR375/562.50/700 per 20′/40′/45′ for DG respectively.',
-          inspectionFees: 'SAR 140 per container',
-          reeferPlugInCharges: 'SAR 134/day per reefer',
-          specialGearCharges: 'SAR 300 per unit for OOG',
-          riyadhDestinedContainerShifting: 'SAR 60 per unit',
-          xRayChargesForRiyadhShifting: 'SAR 460/560 (20′/40′)',
-          lineDetection: 'As per MAWANI regulation article 28/02',
-          damageRepairCleaningCharges: 'as per actual, if any.',
+          // Empty charges and fees field by default
+          chargesAndFees: '',
           // Fields fetched from LATEST shipment data
           portOfLoading: latestShipment.polPort?.portName || '',
           portOfDischarge: latestShipment.podPort?.portName || '',
@@ -1011,14 +974,17 @@ const AllShipmentsPage = () => {
           shippersAddress: '',
           shippersContactNo: '',
           shippersEmail: '',
+          shipperInfo: '',
           consigneeName: '',
           consigneeAddress: '',
           consigneeContactNo: '',
           consigneeEmail: '',
+          consigneeInfo: '',
           notifyPartyName: '',
           notifyPartyAddress: '',
           notifyPartyContactNo: '',
           notifyPartyEmail: '',
+          notifyPartyInfo: '',
           containerNos: shipment.containers?.map((c: any) => c.containerNumber).join(', ') || '',
           sealNo: '',
           grossWt: '',
@@ -1030,18 +996,10 @@ const AllShipmentsPage = () => {
           Vat: '',
           deliveryAgentContactNo: '',
           deliveryAgentEmail: '',
+          deliveryAgentInfo: '',
           freightAmount: '',
-          // New charge fields with default values
-          securityDeposit: 'SAR 3000 per dry container & SAR 7,000 per Reefer/Flat rack/special equipment',
-          loloCharges: 'SAR 100/150 + VAT',
-          Orc: 'SAR 300/450/560 per 20/40/45 for NON-DG and SAR375/562.50/700 per 20′/40′/45′ for DG respectively.',
-          inspectionFees: 'SAR 140 per container',
-          reeferPlugInCharges: 'SAR 134/day per reefer',
-          specialGearCharges: 'SAR 300 per unit for OOG',
-          riyadhDestinedContainerShifting: 'SAR 60 per unit',
-          xRayChargesForRiyadhShifting: 'SAR 460/560 (20′/40′)',
-          lineDetection: 'As per MAWANI regulation article 28/02',
-          damageRepairCleaningCharges: 'as per actual, if any.',
+          // Empty charges and fees field by default
+          chargesAndFees: '',
           // Fields fetched from original shipment data
           portOfLoading: shipment.polPort?.portName || '',
           portOfDischarge: shipment.podPort?.portName || '',
@@ -1075,18 +1033,22 @@ const AllShipmentsPage = () => {
 
       // Create the payload without shipmentId for the new endpoint
       const blPayload = {
+        date: blFormData.date, // Include the editable date
         shippersName: blFormData.shippersName,
         shippersAddress: blFormData.shippersAddress,
         shippersContactNo: blFormData.shippersContactNo,
         shippersEmail: blFormData.shippersEmail,
+        shipperInfo: blFormData.shipperInfo,
         consigneeName: blFormData.consigneeName,
         consigneeAddress: blFormData.consigneeAddress,
         consigneeContactNo: blFormData.consigneeContactNo,
         consigneeEmail: blFormData.consigneeEmail,
+        consigneeInfo: blFormData.consigneeInfo,
         notifyPartyName: blFormData.notifyPartyName,
         notifyPartyAddress: blFormData.notifyPartyAddress,
         notifyPartyContactNo: blFormData.notifyPartyContactNo,
         notifyPartyEmail: blFormData.notifyPartyEmail,
+        notifyPartyInfo: blFormData.notifyPartyInfo,
         containerNos: blFormData.containerNos,
         sealNo: blFormData.sealNo,
         grossWt: blFormData.grossWt,
@@ -1098,21 +1060,13 @@ const AllShipmentsPage = () => {
         Vat: blFormData.Vat,
         deliveryAgentContactNo: blFormData.deliveryAgentContactNo,
         deliveryAgentEmail: blFormData.deliveryAgentEmail,
+        deliveryAgentInfo: blFormData.deliveryAgentInfo,
         freightAmount: blFormData.freightAmount,
         portOfLoading: blFormData.portOfLoading,
         portOfDischarge: blFormData.portOfDischarge,
         vesselNo: blFormData.vesselNo,
-        // New charge fields
-        securityDeposit: blFormData.securityDeposit,
-        loloCharges: blFormData.loloCharges,
-        Orc: blFormData.Orc,
-        inspectionFees: blFormData.inspectionFees,
-        reeferPlugInCharges: blFormData.reeferPlugInCharges,
-        specialGearCharges: blFormData.specialGearCharges,
-        riyadhDestinedContainerShifting: blFormData.riyadhDestinedContainerShifting,
-        xRayChargesForRiyadhShifting: blFormData.xRayChargesForRiyadhShifting,
-        lineDetection: blFormData.lineDetection,
-        damageRepairCleaningCharges: blFormData.damageRepairCleaningCharges,
+        // Charges and fees field
+        chargesAndFees: blFormData.chargesAndFees,
       };
 
       // Debug: Log the payload being sent to backend
@@ -1166,17 +1120,14 @@ const AllShipmentsPage = () => {
   // Handle downloading BL PDF with current form data
   const handleDownloadBlPdf = async () => {
     try {
-      // Get the consistent date from generation status or use current date as fallback
-      const generationStatus = blGenerationStatus[blFormData.shipmentId];
-      const consistentDate = generationStatus?.firstGenerationDate 
-        ? new Date(generationStatus.firstGenerationDate).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0];
+      // Use the date from the form (user can edit this)
+      const formDate = blFormData.date || new Date().toISOString().split('T')[0];
 
-      // Convert form data to match BLFormData interface structure
+      // Convert form data to match BLFormData interface structurea
       const pdfData: BLFormData = {
         shipmentId: blFormData.shipmentId,
         blType: currentBlType,
-        date: consistentDate,
+        date: formDate,
         blNumber: `${currentBlType.toUpperCase()}-${Date.now()}`,
         shipper: blFormData.shippersName,
         consignee: blFormData.consigneeName,
@@ -1196,7 +1147,7 @@ const AllShipmentsPage = () => {
         freightPayableAt: '',
         numberOfOriginals: '',
         placeOfIssue: '',
-        dateOfIssue: consistentDate,
+        dateOfIssue: formDate,
         containers: []
       };
       
@@ -1258,10 +1209,8 @@ const AllShipmentsPage = () => {
         return;
       }
 
-      const generationStatus = blGenerationStatus[shipmentId];
-      const consistentDate = generationStatus?.firstGenerationDate 
-        ? new Date(generationStatus.firstGenerationDate).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0];
+      // Use the saved date from existing BL or current date as fallback
+      const formDate = existingBl.date || new Date().toISOString().split('T')[0];
 
       // Build BL data using the SNAPSHOT saved at first generation (do not reflect later shipment edits)
       const savedContainerNumbers2 = existingBl.containerNos
@@ -1281,7 +1230,7 @@ const AllShipmentsPage = () => {
       const pdfData: BLFormData = {
         shipmentId: shipmentId,
         blType: blType,
-        date: consistentDate,
+        date: formDate,
         blNumber: `${blType.toUpperCase()}-${Date.now()}`,
         shipper: existingBl.shippersName,
         consignee: existingBl.consigneeName,
@@ -1301,7 +1250,7 @@ const AllShipmentsPage = () => {
         freightPayableAt: '',
         numberOfOriginals: '',
         placeOfIssue: '',
-        dateOfIssue: consistentDate,
+        dateOfIssue: formDate,
         containers: []
       };
       
@@ -1341,10 +1290,8 @@ const AllShipmentsPage = () => {
         return;
       }
 
-      const generationStatus = blGenerationStatus[shipmentId];
-      const consistentDate = generationStatus?.firstGenerationDate 
-        ? new Date(generationStatus.firstGenerationDate).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0];
+      // Use the saved date from existing BL or current date as fallback
+      const formDate = existingBl.date || new Date().toISOString().split('T')[0];
 
       // Build BL data using the SNAPSHOT saved at first generation (do not reflect later shipment edits)
       const savedContainerNumbers3 = existingBl.containerNos
@@ -1364,7 +1311,7 @@ const AllShipmentsPage = () => {
       const pdfData: BLFormData = {
         shipmentId: shipmentId,
         blType: blType,
-        date: consistentDate,
+        date: formDate,
         blNumber: `${blType.toUpperCase()}-${Date.now()}`,
         shipper: existingBl.shippersName,
         consignee: existingBl.consigneeName,
@@ -1384,7 +1331,7 @@ const AllShipmentsPage = () => {
         freightPayableAt: '',
         numberOfOriginals: '',
         placeOfIssue: '',
-        dateOfIssue: consistentDate,
+        dateOfIssue: formDate,
         containers: []
       };
       
@@ -1405,6 +1352,105 @@ const AllShipmentsPage = () => {
     } catch (error) {
       console.error('Error generating 3rd copy PDF:', error);
       alert('Error generating 3rd copy PDF. Please try again.');
+    }
+  };
+
+  // Direct BL download function without opening modal
+  const handleDirectBlDownload = async (shipmentId: number, blType: BLType) => {
+    try {
+      // Fetch the existing BL data for this shipment
+      const existingBlResponse = await axios.get(`http://localhost:8000/bill-of-lading/shipment/${shipmentId}`);
+      const existingBl = existingBlResponse.data;
+      
+      if (!existingBl) {
+        alert(`${blType.charAt(0).toUpperCase() + blType.slice(1)} BL data not found. Please generate it first.`);
+        return;
+      }
+
+      // Fetch the latest shipment data to get current container information
+      const latestShipmentResponse = await axios.get(`http://localhost:8000/shipment/${shipmentId}`);
+      const latestShipment = latestShipmentResponse.data;
+
+      // Use the saved date from existing BL or current date as fallback
+      const formDate = existingBl.date || new Date().toISOString().split('T')[0];
+
+      // Build BL data using the saved BL data
+      const pdfData = {
+        shipmentId: shipmentId,
+        blType: blType,
+        date: formDate,
+        blNumber: `${blType.toUpperCase()}-${Date.now()}`,
+        shipper: existingBl.shippersName,
+        consignee: existingBl.consigneeName,
+        notifyParty: existingBl.notifyPartyName,
+        placeOfAcceptance: '',
+        portOfLoading: '',
+        portOfDischarge: '',
+        placeOfDelivery: '',
+        vesselVoyageNo: '',
+        containerInfo: '',
+        marksNumbers: '',
+        descriptionOfGoods: existingBl.billofLadingDetails,
+        grossWeight: existingBl.grossWt,
+        netWeight: existingBl.netWt,
+        shippingMarks: '',
+        freightCharges: existingBl.freightAmount,
+        freightPayableAt: '',
+        numberOfOriginals: '',
+        placeOfIssue: '',
+        dateOfIssue: formDate,
+        containers: []
+      };
+      
+      // Reconstruct container data from saved BL fields
+      const savedContainerNumbers = existingBl.containerNos
+        ? String(existingBl.containerNos).split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+        : [];
+      const savedSealNumbers = existingBl.sealNo ? String(existingBl.sealNo).split(',').map((s: string) => s.trim()) : [];
+      const savedGrossWeights = existingBl.grossWt ? String(existingBl.grossWt).split(',').map((s: string) => s.trim()) : [];
+      const savedNetWeights = existingBl.netWt ? String(existingBl.netWt).split(',').map((s: string) => s.trim()) : [];
+
+      // Build containers with saved BL data
+      const reconstructedContainers = savedContainerNumbers.map((containerNumber: string, index: number) => ({
+        containerNumber: containerNumber || '',
+        sealNumber: savedSealNumbers[index] || '',
+        grossWt: savedGrossWeights[index] || '',
+        netWt: savedNetWeights[index] || ''
+      }));
+
+      const blDataWithCurrentContainers = {
+        ...existingBl,
+        containers: reconstructedContainers
+      };
+      
+      await generateBlPdf(blType, pdfData, blDataWithCurrentContainers, 0); // 0 = original copy
+      
+    } catch (error) {
+      console.error('Error downloading BL PDF directly:', error);
+      alert('Error downloading BL PDF. Please try again.');
+    }
+  };
+
+  // Direct CRO download function (reusing existing CRO modal data)
+  const handleDirectCroDownload = async (shipmentId: number) => {
+    try {
+      // Fetch shipment data
+      const shipmentResponse = await axios.get(`http://localhost:8000/shipment/${shipmentId}`);
+      const shipment = shipmentResponse.data;
+      
+      if (!shipment.containers || shipment.containers.length === 0) {
+        alert('No containers found for this shipment.');
+        return;
+      }
+
+      // Use current date as we don't have a specific CRO date saved
+      const currentDate = new Date().toISOString().split('T')[0];
+      
+      await generateCroPdf(shipmentId, shipment.containers, currentDate);
+      
+    } catch (error) {
+      console.error('Error downloading CRO PDF directly:', error);
+      alert('Error downloading CRO PDF. Please try again.');
     }
   };
 
@@ -1561,7 +1607,6 @@ const AllShipmentsPage = () => {
               <TableHead className="text-black dark:text-neutral-200 font-medium">Shipper</TableHead>
               <TableHead className="text-black dark:text-neutral-200 font-medium">Product</TableHead>
               <TableHead className="text-black dark:text-neutral-200 font-medium">Ports</TableHead>
-              <TableHead className="text-black dark:text-neutral-200 font-medium">Containers</TableHead>
               <TableHead className="text-black dark:text-neutral-200 font-medium">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -1597,11 +1642,6 @@ const AllShipmentsPage = () => {
                     <TableCell>{shipment.shipperAddressBook?.companyName || '-'}</TableCell>
                     <TableCell>{shipment.product?.productName || '-'}</TableCell>
                     <TableCell>{shipment.polPort?.portName || '-'} → {shipment.podPort?.portName || '-'}</TableCell>
-                    <TableCell>
-                      {(shipment.containers ?? [])
-                        .map((c: any) => c.containerNumber)
-                        .join(', ') || '-'}
-                    </TableCell>
                     <TableCell className="space-x-2">
                       <Button
                         onClick={() => handleView(shipment)}
@@ -1641,22 +1681,86 @@ const AllShipmentsPage = () => {
                             <MoreVertical size={16} />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleOpenCroModal(shipment)} className='cursor-pointer'>
-                            Generate CRO
+                        <DropdownMenuContent align="end" className="min-w-[240px]">
+                          {/* CRO Options */}
+                          <DropdownMenuItem className='cursor-pointer flex items-center justify-between py-2'>
+                            <span onClick={() => handleOpenCroModal(shipment)} className="flex-1 hover:text-blue-600">
+                              Generate CRO
+                            </span>
+                            {croGenerationStatus[shipment.id]?.hasCroGenerated && (
+                              <div className="ml-4 border-l border-gray-200 pl-3">
+                                <Download 
+                                  size={16} 
+                                  className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDirectCroDownload(shipment.id);
+                                  }}
+
+                                />
+                              </div>
+                            )}
                           </DropdownMenuItem>
-                          {/* Always show Draft BL option */}
-                          <DropdownMenuItem onClick={() => handleOpenBlModal(shipment, 'draft')} className='cursor-pointer'>
-                            Generate Draft BL
+                          
+                          {/* Draft BL Options */}
+                          <DropdownMenuItem className='cursor-pointer flex items-center justify-between py-2'>
+                            <span onClick={() => handleOpenBlModal(shipment, 'draft')} className="flex-1 hover:text-blue-600">
+                              Generate Draft BL
+                            </span>
+                            {blGenerationStatus[shipment.id]?.hasDraftBlGenerated && (
+                              <div className="ml-4 border-l border-gray-200 pl-3">
+                                <Download 
+                                  size={16} 
+                                  className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDirectBlDownload(shipment.id, 'draft');
+                                  }}
+
+                                />
+                              </div>
+                            )}
                           </DropdownMenuItem>
-                          {/* Show Original and Seaway BL options only after draft has been generated at least once */}
+                          
+                          {/* Original and Seaway BL Options - only after draft has been generated */}
                           {blGenerationStatus[shipment.id]?.hasDraftBlGenerated && (
                             <>
-                              <DropdownMenuItem onClick={() => handleOpenBlModal(shipment, 'original')} className='cursor-pointer'>
-                                Generate Original BL
+                              <DropdownMenuItem className='cursor-pointer flex items-center justify-between py-2'>
+                                <span onClick={() => handleOpenBlModal(shipment, 'original')} className="flex-1 hover:text-blue-600">
+                                  Generate Original BL
+                                </span>
+                                {blGenerationStatus[shipment.id]?.hasOriginalBLGenerated && (
+                                  <div className="ml-4 border-l border-gray-200 pl-3">
+                                    <Download 
+                                      size={16} 
+                                      className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDirectBlDownload(shipment.id, 'original');
+                                      }}
+
+                                    />
+                                  </div>
+                                )}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleOpenBlModal(shipment, 'seaway')} className='cursor-pointer'>
-                                Generate Seaway BL
+                              
+                              <DropdownMenuItem className='cursor-pointer flex items-center justify-between py-2'>
+                                <span onClick={() => handleOpenBlModal(shipment, 'seaway')} className="flex-1 hover:text-blue-600">
+                                  Generate Seaway BL
+                                </span>
+                                {blGenerationStatus[shipment.id]?.hasDraftBlGenerated && (
+                                  <div className="ml-4 border-l border-gray-200 pl-3">
+                                    <Download 
+                                      size={16} 
+                                      className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDirectBlDownload(shipment.id, 'seaway');
+                                      }}
+
+                                    />
+                                  </div>
+                                )}
                               </DropdownMenuItem>
                             </>
                           )}
@@ -1700,7 +1804,7 @@ const AllShipmentsPage = () => {
             {/* Document Information */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="date">Date (Fixed)</Label>
+                <Label htmlFor="date">CRO Issued Date</Label>
                 <Input
                   id="date"
                   type="date"
@@ -1946,16 +2050,17 @@ const AllShipmentsPage = () => {
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
+            
             {/* Date Field - Added at the top */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="blDate">Generated Date (Fixed)</Label>
+                <Label htmlFor="blDate">BL Issued Date</Label>
                 <Input
                   id="blDate"
                   type="date"
                   value={blFormData.date}
-                  disabled
-                  className="bg-gray-100 cursor-not-allowed"
+                  onChange={(e) => setBlFormData({...blFormData, date: e.target.value})}
+                  className="bg-white dark:bg-black"
                 />
               </div>
               <div className="space-y-2">
@@ -1978,213 +2083,72 @@ const AllShipmentsPage = () => {
               </div>
             </div>
             {/* Shipper Information */}
-            <hr className="dark:border-black"/>
+            <hr className="dark:border-black  "/>
             <div className="mt-4">
-              <h3 className="text-lg font-semibold mb-3">Shipper Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="shippersName">Shipper Name *</Label>
-                  <Input
-                    id="shippersName"
-                    value={blFormData.shippersName}
-                    onChange={(e) => setBlFormData({...blFormData, shippersName: e.target.value})}
-                    placeholder="Enter shipper name"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shippersAddress">Shipper Address</Label>
-                  <Input
-                    id="shippersAddress"
-                    value={blFormData.shippersAddress}
-                    onChange={(e) => setBlFormData({...blFormData, shippersAddress: e.target.value})}
-                    placeholder="Enter shipper address"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-3">
-                <div className="space-y-2">
-                  <Label htmlFor="shippersContactNo">Shipper Contact No</Label>
-                  <Input
-                    id="shippersContactNo"
-                    value={blFormData.shippersContactNo}
-                    onChange={(e) => setBlFormData({...blFormData, shippersContactNo: e.target.value})}
-                    placeholder="Enter shipper contact number"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="shippersEmail">Shipper Email</Label>
-                  <Input
-                    id="shippersEmail"
-                    value={blFormData.shippersEmail}
-                    onChange={(e) => setBlFormData({...blFormData, shippersEmail: e.target.value})}
-                    placeholder="Enter shipper email"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
+              <h3 className="text-lg font-semibold mb-3">Shipper Section</h3>
+              <div className="space-y-2">
+                <Label htmlFor="shipperInfo">Shipper Information</Label>
+                <Textarea
+                  id="shipperInfo"
+                  value={blFormData.shipperInfo}
+                  onChange={(e) => setBlFormData({...blFormData, shipperInfo: e.target.value})}
+                  placeholder="Enter all shipper information here. You can copy and paste from existing sources."
+                  className="bg-white dark:bg-black min-h-[120px] resize-vertical"
+                  rows={6}
+                />
               </div>
             </div>
 
             {/* Consignee Information */}
             <hr className="border-black" />
             <div className="mt-4">
-              <h3 className="text-lg font-semibold mb-3">Consignee Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="consigneeName">Consignee Name *</Label>
-                  <Input
-                    id="consigneeName"
-                    value={blFormData.consigneeName}
-                    onChange={(e) => setBlFormData({...blFormData, consigneeName: e.target.value})}
-                    placeholder="Enter consignee name"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="consigneeAddress">Consignee Address</Label>
-                  <Input
-                    id="consigneeAddress"
-                    value={blFormData.consigneeAddress}
-                    onChange={(e) => setBlFormData({...blFormData, consigneeAddress: e.target.value})}
-                    placeholder="Enter consignee address"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-3">
-                <div className="space-y-2">
-                  <Label htmlFor="consigneeContactNo">Consignee Contact No</Label>
-                  <Input
-                    id="consigneeContactNo"
-                    value={blFormData.consigneeContactNo}
-                    onChange={(e) => setBlFormData({...blFormData, consigneeContactNo: e.target.value})}
-                    placeholder="Enter consignee contact number"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="consigneeEmail">Consignee Email</Label>
-                  <Input
-                    id="consigneeEmail"
-                    value={blFormData.consigneeEmail}
-                    onChange={(e) => setBlFormData({...blFormData, consigneeEmail: e.target.value})}
-                    placeholder="Enter consignee email"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
+              <h3 className="text-lg font-semibold mb-3">Consignee Section</h3>
+              <div className="space-y-2">
+                <Label htmlFor="consigneeInfo">Consignee Information</Label>
+                <Textarea
+                  id="consigneeInfo"
+                  value={blFormData.consigneeInfo}
+                  onChange={(e) => setBlFormData({...blFormData, consigneeInfo: e.target.value})}
+                  placeholder="Enter all consignee information here. You can copy and paste from existing sources."
+                  className="bg-white dark:bg-black min-h-[120px] resize-vertical"
+                  rows={6}
+                />
               </div>
             </div>
 
             {/* Notify Party Information */}
             <hr className="border-black" />
             <div className="mt-4">
-              <h3 className="text-lg font-semibold mb-3">Notify Party Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="notifyPartyName">Notify Party Name *</Label>
-                  <Input
-                    id="notifyPartyName"
-                    value={blFormData.notifyPartyName}
-                    onChange={(e) => setBlFormData({...blFormData, notifyPartyName: e.target.value})}
-                    placeholder="Enter notify party name"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notifyPartyAddress">Notify Party Address</Label>
-                  <Input
-                    id="notifyPartyAddress"
-                    value={blFormData.notifyPartyAddress}
-                    onChange={(e) => setBlFormData({...blFormData, notifyPartyAddress: e.target.value})}
-                    placeholder="Enter notify party address"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 mt-3">
-                <div className="space-y-2">
-                  <Label htmlFor="notifyPartyContactNo">Notify Party Contact No</Label>
-                  <Input
-                    id="notifyPartyContactNo"
-                    value={blFormData.notifyPartyContactNo}
-                    onChange={(e) => setBlFormData({...blFormData, notifyPartyContactNo: e.target.value})}
-                    placeholder="Enter notify party contact number"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="notifyPartyEmail">Notify Party Email</Label>
-                  <Input
-                    id="notifyPartyEmail"
-                    value={blFormData.notifyPartyEmail}
-                    onChange={(e) => setBlFormData({...blFormData, notifyPartyEmail: e.target.value})}
-                    placeholder="Enter notify party email"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
+              <h3 className="text-lg font-semibold mb-3">Notify Party Section</h3>
+              <div className="space-y-2">
+                <Label htmlFor="notifyPartyInfo">Notify Party Information</Label>
+                <Textarea
+                  id="notifyPartyInfo"
+                  value={blFormData.notifyPartyInfo}
+                  onChange={(e) => setBlFormData({...blFormData, notifyPartyInfo: e.target.value})}
+                  placeholder="Enter all notify party information here. You can copy and paste from existing sources."
+                  className="bg-white dark:bg-black min-h-[120px] resize-vertical"
+                  rows={6}
+                />
               </div>
             </div>
 
             {/* Delivery Agent Information */}
             <hr className="border-black" />
             <div className="mt-4">
-              <h3 className="text-lg font-semibold mb-3">Delivery Agent Information</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="deliveryAgentName">Delivery Agent Name *</Label>
-                  <Input
-                    id="deliveryAgentName"
-                    value={blFormData.deliveryAgentName}
-                    onChange={(e) => setBlFormData({...blFormData, deliveryAgentName: e.target.value})}
-                    placeholder="Enter delivery agent name"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="deliveryAgentAddress">Delivery Agent Address</Label>
-                  <Input
-                    id="deliveryAgentAddress"
-                    value={blFormData.deliveryAgentAddress}
-                    onChange={(e) => setBlFormData({...blFormData, deliveryAgentAddress: e.target.value})}
-                    placeholder="Enter delivery agent address"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
+              <h3 className="text-lg font-semibold mb-3">Delivery Agent Section</h3>
+              <div className="space-y-2">
+                <Label htmlFor="deliveryAgentInfo">Delivery Agent Information</Label>
+                <Textarea
+                  id="deliveryAgentInfo"
+                  value={blFormData.deliveryAgentInfo}
+                  onChange={(e) => setBlFormData({...blFormData, deliveryAgentInfo: e.target.value})}
+                  placeholder="Enter all delivery agent information here. You can copy and paste from existing sources."
+                  className="bg-white dark:bg-black min-h-[120px] resize-vertical"
+                  rows={6}
+                />
               </div>
-              <div className="grid grid-cols-3 gap-4 mt-3">
-                <div className="space-y-2">
-                  <Label htmlFor="deliveryAgentContactNo">Delivery Agent Contact No</Label>
-                  <Input
-                    id="deliveryAgentContactNo"
-                    value={blFormData.deliveryAgentContactNo}
-                    onChange={(e) => setBlFormData({...blFormData, deliveryAgentContactNo: e.target.value})}
-                    placeholder="Enter delivery agent contact number"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="deliveryAgentEmail">Delivery Agent Email</Label>
-                  <Input
-                    id="deliveryAgentEmail"
-                    value={blFormData.deliveryAgentEmail}
-                    onChange={(e) => setBlFormData({...blFormData, deliveryAgentEmail: e.target.value})}
-                    placeholder="Enter delivery agent email"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vat">VAT</Label>
-                  <Input
-                    id="vat"
-                    value={blFormData.Vat}
-                    onChange={(e) => setBlFormData({...blFormData, Vat: e.target.value})}
-                    placeholder="Enter VAT amount"
-                    className="bg-white dark:bg-black"
-                  />
-                </div>
-              </div>
+              {/* VAT field removed - now included in delivery agent info field above */}
             </div>
 
             {/* Port & Vessel Information */}
@@ -2339,7 +2303,7 @@ const AllShipmentsPage = () => {
             <hr className="border-black" />
             <div className="mt-4">
               <h3 className="text-lg font-semibold mb-3">Freight Information</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid w-full">
                 <div className="space-y-2">
                   <Label htmlFor="freightPayableAt">Freight Payable At</Label>
                   <Select
@@ -2355,7 +2319,7 @@ const AllShipmentsPage = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <Label htmlFor="freightAmount">Freight Amount</Label>
                   <Input
                     id="freightAmount"
@@ -2364,114 +2328,23 @@ const AllShipmentsPage = () => {
                     placeholder="Enter freight amount"
                     className="bg-white dark:bg-black"
                   />
-                </div>
+                </div> */}
               </div>
 
               {/* Charges Section */}
                <hr className="dark:border-black mt-4"/>
               <div className="mt-4">
-                <h3 className="text-lg font-semibold">Charges and Fees</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2 mt-4">
-                    <Label htmlFor="securityDeposit">Security Deposit</Label>
-                    <Input
-                      id="securityDeposit"
-                      value={blFormData.securityDeposit}
-                      onChange={(e) => setBlFormData({...blFormData, securityDeposit: e.target.value})}
-                      placeholder="Security deposit details"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2 mt-4">
-                    <Label htmlFor="loloCharges">LOLO Charges</Label>
-                    <Input
-                      id="loloCharges"
-                      value={blFormData.loloCharges}
-                      onChange={(e) => setBlFormData({...blFormData, loloCharges: e.target.value})}
-                      placeholder="LOLO charges"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="Orc">ORC</Label>
-                    <Input
-                      id="Orc"
-                      value={blFormData.Orc}
-                      onChange={(e) => setBlFormData({...blFormData, Orc: e.target.value})}
-                      placeholder="ORC charges"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="inspectionFees">Inspection Fees</Label>
-                    <Input
-                      id="inspectionFees"
-                      value={blFormData.inspectionFees}
-                      onChange={(e) => setBlFormData({...blFormData, inspectionFees: e.target.value})}
-                      placeholder="Inspection fees"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="reeferPlugInCharges">Reefer Plug In Charges</Label>
-                    <Input
-                      id="reeferPlugInCharges"
-                      value={blFormData.reeferPlugInCharges}
-                      onChange={(e) => setBlFormData({...blFormData, reeferPlugInCharges: e.target.value})}
-                      placeholder="Reefer plug in charges"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="specialGearCharges">Special Gear Charges</Label>
-                    <Input
-                      id="specialGearCharges"
-                      value={blFormData.specialGearCharges}
-                      onChange={(e) => setBlFormData({...blFormData, specialGearCharges: e.target.value})}
-                      placeholder="Special gear charges"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="riyadhDestinedContainerShifting">Riyadh Destined Container Shifting</Label>
-                    <Input
-                      id="riyadhDestinedContainerShifting"
-                      value={blFormData.riyadhDestinedContainerShifting}
-                      onChange={(e) => setBlFormData({...blFormData, riyadhDestinedContainerShifting: e.target.value})}
-                      placeholder="Riyadh destined container shifting"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="xRayChargesForRiyadhShifting">X-Ray Charges For Riyadh Shifting</Label>
-                    <Input
-                      id="xRayChargesForRiyadhShifting"
-                      value={blFormData.xRayChargesForRiyadhShifting}
-                      onChange={(e) => setBlFormData({...blFormData, xRayChargesForRiyadhShifting: e.target.value})}
-                      placeholder="X-Ray charges for Riyadh shifting"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lineDetection">Line Detection</Label>
-                    <Input
-                      id="lineDetection"
-                      value={blFormData.lineDetection}
-                      onChange={(e) => setBlFormData({...blFormData, lineDetection: e.target.value})}
-                      placeholder="Line detection charges"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="damageRepairCleaningCharges">Damage Repair Cleaning Charges</Label>
-                    <Input
-                      id="damageRepairCleaningCharges"
-                      value={blFormData.damageRepairCleaningCharges}
-                      onChange={(e) => setBlFormData({...blFormData, damageRepairCleaningCharges: e.target.value})}
-                      placeholder="Damage repair cleaning charges"
-                      className="bg-white dark:bg-black"
-                    />
-                  </div>
+                <h3 className="text-lg font-semibold">Charges and Fees Section</h3>
+                <div className="space-y-2 mt-4">
+                  <Label htmlFor="chargesAndFees">Charges and Fees</Label>
+                  <Textarea
+                    id="chargesAndFees"
+                    value={blFormData.chargesAndFees}
+                    onChange={(e) => setBlFormData({...blFormData, chargesAndFees: e.target.value})}
+                    placeholder="Enter all charges and fees information here. You can copy and paste from existing sources."
+                    className="bg-white dark:bg-black min-h-32"
+                    rows={8}
+                  />
                 </div>
               </div>
             </div>

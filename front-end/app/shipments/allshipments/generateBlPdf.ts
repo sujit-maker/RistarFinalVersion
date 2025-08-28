@@ -74,8 +74,51 @@ export async function generateBlPdf(
   blFormData?: any, // Add the BL form data parameter
   copyNumber: number = 0 // Add copy number parameter (0=original, 1=2nd copy, 2=3rd copy)
 ) {
-  // Create PDF with A3 width but increased height for better footer fitting
-  const doc = new jsPDF('p', 'mm', [297, 420]); // A3 width (297mm) with increased height
+  // First calculate the required content height based on filled fields
+  const calculateRequiredHeight = () => {
+    let totalHeight = 0;
+    
+    // Base header height (constant): ~150mm
+    totalHeight += 150;
+    
+    // Container section height (varies based on containers): ~50-80mm
+    const containersToShow = (blFormData?.containers && blFormData.containers.length > 0) 
+      ? blFormData.containers 
+      : [];
+    
+    if (containersToShow.length > 3) {
+      // If more than 3 containers, they go to a separate page
+      totalHeight += 50; // Just the notice text
+    } else {
+      totalHeight += Math.max(50, containersToShow.length * 15); // Variable height based on containers
+    }
+    
+    // Bottom section (delivery agent, freight, etc.): ~50mm
+    totalHeight += 50;
+    
+    // Terms section height (varies based on charges content)
+    let termsHeight = 0;
+    if (blFormData?.chargesAndFees && blFormData.chargesAndFees.trim()) {
+      // Estimate height based on charges content length
+      const chargesLength = blFormData.chargesAndFees.length;
+      termsHeight = Math.max(80, Math.min(120, 80 + (chargesLength / 100) * 10));
+    } else {
+      // Minimal height when no charges
+      termsHeight = 60;
+    }
+    totalHeight += termsHeight;
+    
+    // Bottom margin
+    totalHeight += 20;
+    
+    // Minimum height for proper proportions
+    return Math.max(totalHeight, 250);
+  };
+  
+  const dynamicPageHeight = calculateRequiredHeight();
+  
+  // Create PDF with A3 width and calculated dynamic height
+  const doc = new jsPDF('p', 'mm', [297, dynamicPageHeight]);
 
   try {
     // Fetch shipment data for additional info like ports and vessel details
@@ -90,8 +133,9 @@ export async function generateBlPdf(
     const addressBooks = addressBooksRes.data;
     const products = productsRes.data;
 
-    // Use BL form data instead of address book lookups
+    // Use BL form data instead of address book lookups - prefer combined fields
     const shipper = blFormData ? {
+      combinedInfo: blFormData.shipperInfo,
       companyName: blFormData.shippersName,
       address: blFormData.shippersAddress,
       phone: blFormData.shippersContactNo,
@@ -104,6 +148,7 @@ export async function generateBlPdf(
     };
 
     const consignee = blFormData ? {
+      combinedInfo: blFormData.consigneeInfo,
       companyName: blFormData.consigneeName,
       address: blFormData.consigneeAddress,
       phone: blFormData.consigneeContactNo,
@@ -116,6 +161,7 @@ export async function generateBlPdf(
     };
 
     const notifyParty = blFormData ? {
+      combinedInfo: blFormData.notifyPartyInfo,
       companyName: blFormData.notifyPartyName,
       address: blFormData.notifyPartyAddress,
       phone: blFormData.notifyPartyContactNo,
@@ -141,16 +187,18 @@ export async function generateBlPdf(
     const grossWeight = blFormData ? blFormData.grossWt : formData.grossWeight || '';
     const netWeight = blFormData ? blFormData.netWt : formData.netWeight || '';
     
-    // Use delivery agent info from BL form
+    // Use delivery agent info from BL form - prefer combined field
     const deliveryAgent = blFormData ? {
+      combinedInfo: blFormData.deliveryAgentInfo,
       name: blFormData.deliveryAgentName,
       address: blFormData.deliveryAgentAddress,
       contactNo: blFormData.deliveryAgentContactNo,
-      email: blFormData.deliveryAgentEmail
+      email: blFormData.deliveryAgentEmail,
+      vat: blFormData.Vat
     } : null;
     
     // Use freight amount from BL form - it's mapped as freightCharges in the pdfData
-    const freightAmount = blFormData?.freightAmount || formData?.freightCharges || '';
+    // const freightAmount = blFormData?.freightAmount || formData?.freightCharges || '';
     
     // Use BL details from form
     const blDetails = blFormData?.billofLadingDetails || '';
@@ -204,14 +252,14 @@ export async function generateBlPdf(
     const marginX = (pageWidth - contentWidth) / 2; // Center horizontally
     const marginY = 4; // Top margin reduced to shift content up
 
-    // Main border (centered)
+    // Main border (centered) with dynamic height
     doc.setDrawColor(0);
     doc.setLineWidth(0.5);
-    // Draw outer border including bottom edge (explicit lines for crisp edges)
+    // Draw outer border with calculated dimensions
     doc.line(marginX, marginY, marginX + contentWidth, marginY); // top
-    doc.line(marginX, marginY, marginX, marginY + pageHeight - 30); // left
-    doc.line(marginX + contentWidth, marginY, marginX + contentWidth, marginY + pageHeight - 30); // right
-    doc.line(marginX, marginY + pageHeight - 30, marginX + contentWidth, marginY + pageHeight - 30); // bottom
+    doc.line(marginX, marginY, marginX, dynamicPageHeight - 15); // left
+    doc.line(marginX + contentWidth, marginY, marginX + contentWidth, dynamicPageHeight - 15); // right
+    doc.line(marginX, dynamicPageHeight - 15, marginX + contentWidth, dynamicPageHeight - 15); // bottom
     
     // Header big box and split column like first image
     // Move header up to overlap the outer border top (removes the top gap/second line)
@@ -244,45 +292,61 @@ export async function generateBlPdf(
     // SHIPPER section - very compact
     doc.setFontSize(11);
     doc.setFont('arial', 'bold');
-    doc.text('SHIPPER', leftX, y);
+    doc.text('Shipper', leftX, y);
     y += sectionPadding;
     
     const shipperStartY = y;
     let currentFieldY = y;
     
-    // Shipper Name - Bold (only if space available)
-    if (shipper?.companyName && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
-      doc.setFont('arial', 'bold');
-      doc.setFontSize(10);
-      const nameLines = doc.splitTextToSize(shipper.companyName, leftMaxWidth);
-      doc.text(nameLines[0], leftX, currentFieldY); // Only first line
-      currentFieldY += 4;
-    }
-    
-    // Shipper Address - Normal (only if space available)
-    if (shipper?.address && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
+    // Use combined shipper info if available, otherwise fall back to individual fields
+    if (shipper?.combinedInfo && shipper.combinedInfo.trim()) {
+      // Use combined field like charges and fees
       doc.setFont('arial', 'normal');
       doc.setFontSize(10);
-      const addressLines = doc.splitTextToSize(shipper.address, leftMaxWidth);
-      doc.text(addressLines[0], leftX, currentFieldY); // Only first line
-      currentFieldY += 4;
-    }
-    
-    // Shipper Phone - Normal (only if space available)
-    if (shipper?.phone && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
-      doc.setFont('arial', 'normal');
-      doc.setFontSize(10);
-      const telLines = doc.splitTextToSize(`TEL: ${shipper.phone}`, leftMaxWidth);
-      doc.text(telLines[0], leftX, currentFieldY);
-      currentFieldY += 4;
-    }
-    
-    // Shipper Email - Normal (only if space available)
-    if (shipper?.email && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
-      doc.setFont('arial', 'normal');
-      doc.setFontSize(10);
-      const emailLines = doc.splitTextToSize(`EMAIL: ${shipper.email}`, leftMaxWidth);
-      doc.text(emailLines[0], leftX, currentFieldY);
+      const combinedLines = doc.splitTextToSize(shipper.combinedInfo, leftMaxWidth);
+      
+      // Display as many lines as fit in the available space
+      combinedLines.forEach((line: string, index: number) => {
+        if (currentFieldY + (index * 4) < shipperStartY + shipperMaxHeight - 2) {
+          doc.text(line, leftX, currentFieldY + (index * 4));
+        }
+      });
+    } else {
+      // Fallback to individual fields if combined field is empty
+      // Shipper Name - Bold (only if space available)
+      if (shipper?.companyName && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
+        doc.setFont('arial', 'bold');
+        doc.setFontSize(10);
+        const nameLines = doc.splitTextToSize(shipper.companyName, leftMaxWidth);
+        doc.text(nameLines[0], leftX, currentFieldY); // Only first line
+        currentFieldY += 4;
+      }
+      
+      // Shipper Address - Normal (only if space available)
+      if (shipper?.address && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const addressLines = doc.splitTextToSize(shipper.address, leftMaxWidth);
+        doc.text(addressLines[0], leftX, currentFieldY); // Only first line
+        currentFieldY += 4;
+      }
+      
+      // Shipper Phone - Normal (only if space available)
+      if (shipper?.phone && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const telLines = doc.splitTextToSize(`TEL: ${shipper.phone}`, leftMaxWidth);
+        doc.text(telLines[0], leftX, currentFieldY);
+        currentFieldY += 4;
+      }
+      
+      // Shipper Email - Normal (only if space available)
+      if (shipper?.email && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const emailLines = doc.splitTextToSize(`EMAIL: ${shipper.email}`, leftMaxWidth);
+        doc.text(emailLines[0], leftX, currentFieldY);
+      }
     }
     
     // Fixed shipper underline position
@@ -301,39 +365,55 @@ export async function generateBlPdf(
     const consigneeStartY = y;
     currentFieldY = y;
     
-    // Consignee Name - Bold (only if space available)
-    if (consignee?.companyName && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
-      doc.setFont('arial', 'bold');
-      doc.setFontSize(10);
-      const nameLines = doc.splitTextToSize(consignee.companyName, leftMaxWidth);
-      doc.text(nameLines[0], leftX, currentFieldY); // Only first line
-      currentFieldY += 4;
-    }
-    
-    // Consignee Address - Normal (only if space available)
-    if (consignee?.address && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
+    // Use combined consignee info if available, otherwise fall back to individual fields
+    if (consignee?.combinedInfo && consignee.combinedInfo.trim()) {
+      // Use combined field like charges and fees
       doc.setFont('arial', 'normal');
       doc.setFontSize(10);
-      const addressLines = doc.splitTextToSize(consignee.address, leftMaxWidth);
-      doc.text(addressLines[0], leftX, currentFieldY); // Only first line
-      currentFieldY += 4;
-    }
-    
-    // Consignee Phone - Normal (only if space available)
-    if (consignee?.phone && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
-      doc.setFont('arial', 'normal');
-      doc.setFontSize(10);
-      const telLines = doc.splitTextToSize(`TEL: ${consignee.phone}`, leftMaxWidth);
-      doc.text(telLines[0], leftX, currentFieldY);
-      currentFieldY += 4;
-    }
-    
-    // Consignee Email - Normal (only if space available)
-    if (consignee?.email && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
-      doc.setFont('arial', 'normal');
-      doc.setFontSize(10);
-      const emailLines = doc.splitTextToSize(`EMAIL: ${consignee.email}`, leftMaxWidth);
-      doc.text(emailLines[0], leftX, currentFieldY);
+      const combinedLines = doc.splitTextToSize(consignee.combinedInfo, leftMaxWidth);
+      
+      // Display as many lines as fit in the available space
+      combinedLines.forEach((line: string, index: number) => {
+        if (currentFieldY + (index * 4) < consigneeStartY + consigneeMaxHeight - 2) {
+          doc.text(line, leftX, currentFieldY + (index * 4));
+        }
+      });
+    } else {
+      // Fallback to individual fields if combined field is empty
+      // Consignee Name - Bold (only if space available)
+      if (consignee?.companyName && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
+        doc.setFont('arial', 'bold');
+        doc.setFontSize(10);
+        const nameLines = doc.splitTextToSize(consignee.companyName, leftMaxWidth);
+        doc.text(nameLines[0], leftX, currentFieldY); // Only first line
+        currentFieldY += 4;
+      }
+      
+      // Consignee Address - Normal (only if space available)
+      if (consignee?.address && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const addressLines = doc.splitTextToSize(consignee.address, leftMaxWidth);
+        doc.text(addressLines[0], leftX, currentFieldY); // Only first line
+        currentFieldY += 4;
+      }
+      
+      // Consignee Phone - Normal (only if space available)
+      if (consignee?.phone && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const telLines = doc.splitTextToSize(`TEL: ${consignee.phone}`, leftMaxWidth);
+        doc.text(telLines[0], leftX, currentFieldY);
+        currentFieldY += 4;
+      }
+      
+      // Consignee Email - Normal (only if space available)
+      if (consignee?.email && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const emailLines = doc.splitTextToSize(`EMAIL: ${consignee.email}`, leftMaxWidth);
+        doc.text(emailLines[0], leftX, currentFieldY);
+      }
     }
     
     // Fixed consignee underline position
@@ -351,39 +431,55 @@ export async function generateBlPdf(
     const notifyStartY = y;
     currentFieldY = y;
     
-    // Notify Party Name - Bold (only if space available)
-    if (notifyParty?.companyName && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
-      doc.setFont('arial', 'bold');
-      doc.setFontSize(10);
-      const nameLines = doc.splitTextToSize(notifyParty.companyName, leftMaxWidth);
-      doc.text(nameLines[0], leftX, currentFieldY); // Only first line
-      currentFieldY += 4;
-    }
-    
-    // Notify Party Address - Normal (only if space available)
-    if (notifyParty?.address && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
+    // Use combined notify party info if available, otherwise fall back to individual fields
+    if (notifyParty?.combinedInfo && notifyParty.combinedInfo.trim()) {
+      // Use combined field like charges and fees
       doc.setFont('arial', 'normal');
       doc.setFontSize(10);
-      const addressLines = doc.splitTextToSize(notifyParty.address, leftMaxWidth);
-      doc.text(addressLines[0], leftX, currentFieldY); // Only first line
-      currentFieldY += 4;
-    }
-    
-    // Notify Party Phone - Normal (only if space available)
-    if (notifyParty?.phone && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
-      doc.setFont('arial', 'normal');
-      doc.setFontSize(10);
-      const telLines = doc.splitTextToSize(`TEL: ${notifyParty.phone}`, leftMaxWidth);
-      doc.text(telLines[0], leftX, currentFieldY);
-      currentFieldY += 4;
-    }
-    
-    // Notify Party Email - Normal (only if space available)
-    if (notifyParty?.email && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
-      doc.setFont('arial', 'normal');
-      doc.setFontSize(10);
-      const emailLines = doc.splitTextToSize(`EMAIL: ${notifyParty.email}`, leftMaxWidth);
-      doc.text(emailLines[0], leftX, currentFieldY);
+      const combinedLines = doc.splitTextToSize(notifyParty.combinedInfo, leftMaxWidth);
+      
+      // Display as many lines as fit in the available space
+      combinedLines.forEach((line: string, index: number) => {
+        if (currentFieldY + (index * 4) < notifyStartY + notifyMaxHeight - 2) {
+          doc.text(line, leftX, currentFieldY + (index * 4));
+        }
+      });
+    } else {
+      // Fallback to individual fields if combined field is empty
+      // Notify Party Name - Bold (only if space available)
+      if (notifyParty?.companyName && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
+        doc.setFont('arial', 'bold');
+        doc.setFontSize(10);
+        const nameLines = doc.splitTextToSize(notifyParty.companyName, leftMaxWidth);
+        doc.text(nameLines[0], leftX, currentFieldY); // Only first line
+        currentFieldY += 4;
+      }
+      
+      // Notify Party Address - Normal (only if space available)
+      if (notifyParty?.address && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const addressLines = doc.splitTextToSize(notifyParty.address, leftMaxWidth);
+        doc.text(addressLines[0], leftX, currentFieldY); // Only first line
+        currentFieldY += 4;
+      }
+      
+      // Notify Party Phone - Normal (only if space available)
+      if (notifyParty?.phone && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const telLines = doc.splitTextToSize(`TEL: ${notifyParty.phone}`, leftMaxWidth);
+        doc.text(telLines[0], leftX, currentFieldY);
+        currentFieldY += 4;
+      }
+      
+      // Notify Party Email - Normal (only if space available)
+      if (notifyParty?.email && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const emailLines = doc.splitTextToSize(`EMAIL: ${notifyParty.email}`, leftMaxWidth);
+        doc.text(emailLines[0], leftX, currentFieldY);
+      }
     }
     
     // Fixed notify party end position
@@ -526,9 +622,9 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       if (copyNumber === 0) {
         blTypeText = '1st ORIGINAL B/L';
       } else if (copyNumber === 1) {
-        blTypeText = '2nd COPY B/L';
+        blTypeText = '2nd ORIGINAL B/L';
       } else if (copyNumber === 2) {
-        blTypeText = '3rd COPY B/L';
+        blTypeText = '3rd ORIGINAL B/L';
       }
     } else if (blType === 'draft') {
       if (copyNumber === 0) {
@@ -603,7 +699,7 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       // Add message in container section indicating containers are on next page
       doc.setFont('arial', 'bold');
       doc.setFontSize(10);
-      doc.text('Find the containers details list below the page annexure.', marginX + 5, containerY + 70);
+      doc.text('Find the containers details list below the page annexure.', marginX + 5, containerY + 30);
       
       // Add new page for all containers
       doc.addPage();
@@ -727,8 +823,8 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
         const cell3CenterX = tableX + col1Width + col2Width + col3Width / 2;
         const cell4CenterX = tableX + col1Width + col2Width + col3Width + col4Width / 2;
         doc.text('CONTAINER NO.', cell1CenterX, tableStartY + 6, { align: 'center' });
-        doc.text('PRODUCT GROSS WT', cell2CenterX, tableStartY + 6, { align: 'center' });
-        doc.text('PRODUCT NET WT', cell3CenterX, tableStartY + 6, { align: 'center' });
+        doc.text('GROSS WT', cell2CenterX, tableStartY + 6, { align: 'center' });
+        doc.text('NET WT', cell3CenterX, tableStartY + 6, { align: 'center' });
         doc.text('SEAL NO.', cell4CenterX, tableStartY + 6, { align: 'center' });
         
         // Draw vertical lines for header
@@ -874,25 +970,25 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       addY += 8;
     }
 
-    // Charge lines with better formatting - Use dynamic values from form data
+    // Charge lines with better formatting - Use single charges field or default format
     doc.setFont('arial', 'bold');
     doc.setFontSize(8);
-    const chargeLines = [
-      '"SHIPPING LINE /SHIPPING LINE AGENTS ARE ELIGIBLE UNDER THIS B/L TERMS, TO',
-      'COLLECT CHARGES SUCH AS',
-      `SECURITY DEPOSIT – ${blFormData?.securityDeposit || 'SAR 3000 per dry container & SAR 7,000 per Reefer/Flat rack/special equipment'}`,
-      `LOLO charges: ${blFormData?.loloCharges || 'SAR 100/150 + VAT'}`,
-      `ORC: ${blFormData?.Orc || 'SAR 300/450/560 per 20/40/45 for NON-DG and SAR375/562.50/700 per 20\'/40\'/45\' for DG respectively.'}`,
-      `Inspection Fees: ${blFormData?.inspectionFees || 'SAR 140 per container'}`,
-      `Reefer plug in charges: ${blFormData?.reeferPlugInCharges || 'SAR 134/day per reefer'}`,
-      `Special gear charges: ${blFormData?.specialGearCharges || 'SAR 300 per unit for OOG'}`,
-      `Riyadh destined Container shifting: ${blFormData?.riyadhDestinedContainerShifting || 'SAR 60 per unit'}`,
-      `X-Ray charges for Riyadh shipment: ${blFormData?.xRayChargesForRiyadhShifting || 'SAR 460/560 (20\'/40\')'}`,
-      `Line detention: ${blFormData?.lineDetection || 'As per MAWANI regulation article 28/02'}`,
-      `Damage repair / cleaning charges: ${blFormData?.damageRepairCleaningCharges || 'as per actual, if any.'}`
-    ];
     
-    chargeLines.forEach((t) => {
+    let chargeLines: string[] = [];
+    
+    if (blFormData?.chargesAndFees && blFormData.chargesAndFees.trim()) {
+      // If chargesAndFees field has content, use it directly
+      chargeLines = [
+        '"SHIPPING LINE /SHIPPING LINE AGENTS ARE ELIGIBLE UNDER THIS B/L TERMS, TO',
+        'COLLECT CHARGES SUCH AS',
+        blFormData.chargesAndFees
+      ];
+    } else {
+      // If empty, don't show any charges (as requested)
+      chargeLines = [];
+    }
+    
+    chargeLines.forEach((t: string) => {
       const normalized = normalizePdfText(t);
       // Ensure character spacing is reset to prevent spacing artifacts
       if ((doc as any).setCharSpace) { 
@@ -932,9 +1028,9 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // right vertical
     doc.line(marginX + headerWidth, bottomBoxTop, marginX + headerWidth, bottomBoxTop + bottomBoxHeight);
 
-    // Four-column layout with better proportions: Delivery Agent | Freight Amount | Number of original & Place/date
+    // Four-column layout with better proportions: Delivery Agent | Freight Payable At/Amount | Number of original & Place/date
     const colDA_X = marginX;                                    // left start
-    const colFA_X = marginX + (75 / 190) * headerWidth;        // Freight Amount start  
+    const colFA_X = marginX + (75 / 190) * headerWidth;        // Freight section start  
     const colNUM_X = marginX + (125 / 190) * headerWidth;      // Number of original / Place/date start
     const colRightEnd = marginX + headerWidth;
 
@@ -950,11 +1046,11 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     const rightColX = colNUM_X + rightSectionPaddingLeft;
     const rightSectionRight = colRightEnd - rightSectionPaddingRight; // keep a small inset from border
     doc.text('Delivery Agent', marginX + 5, bottomBoxTop + 8);
-    doc.text('Freight Amount', colFA_X + 5, bottomBoxTop + 8);
+    doc.text('Freight payable at', colFA_X + 5, bottomBoxTop + 8);
     
-    // Add horizontal separator in freight section for "Freight payable at"
-    doc.line(colFA_X, bottomBoxTop + 18, colNUM_X, bottomBoxTop + 18);
-    doc.text('Freight payable at', colFA_X + 5, bottomBoxTop + 26);
+    // Add horizontal separator in freight section for "Freight Amount"
+    // doc.line(colFA_X, bottomBoxTop + 18, colNUM_X, bottomBoxTop + 18);
+    // doc.text('Freight Amount', colFA_X + 5, bottomBoxTop + 26);
     
     // Right section headers - improved alignment and slight extra separation
     doc.text('Number of original BL/MTD(s)', rightColX, bottomBoxTop + 8);
@@ -972,43 +1068,60 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // Use very compact spacing for all fields
     const compactLineSpacing = 4; // Reduced from 4-5
     
-    // Delivery Agent Name - Bold (single line only)
-    if (deliveryAgent?.name && deliveryAgentY < deliveryAgentMaxY - 10) {
-      doc.setFont('arial', 'bold');
-      doc.setFontSize(10); // Reduced font size
-      const nameLines = doc.splitTextToSize(deliveryAgent.name, deliveryAgentMaxWidth);
-      doc.text(nameLines[0], marginX + 5, deliveryAgentY + 2); // Only first line
-      deliveryAgentY += compactLineSpacing;
-    }
-    
-    // Delivery Agent Address - Normal (single line only)
-    if (deliveryAgent?.address && deliveryAgentY < deliveryAgentMaxY - 6) {
+    // Use combined delivery agent info if available, otherwise fall back to individual fields
+    if (deliveryAgent?.combinedInfo && deliveryAgent.combinedInfo.trim()) {
+      // Use combined field like charges and fees
       doc.setFont('arial', 'normal');
       doc.setFontSize(10);
-      const agentAddressLines = doc.splitTextToSize(deliveryAgent.address, deliveryAgentMaxWidth);
-      doc.text(agentAddressLines[0], marginX + 5, deliveryAgentY + 2); // Only first line
-      deliveryAgentY += compactLineSpacing;
+      const combinedLines = doc.splitTextToSize(deliveryAgent.combinedInfo, deliveryAgentMaxWidth);
+      
+      // Display as many lines as fit in the available space
+      combinedLines.forEach((line: string, index: number) => {
+        if (deliveryAgentY + (index * compactLineSpacing) < deliveryAgentMaxY - 2) {
+          doc.text(line, marginX + 5, deliveryAgentY + 2 + (index * compactLineSpacing));
+        }
+      });
+      deliveryAgentY += combinedLines.length * compactLineSpacing;
+    } else {
+      // Fallback to individual fields if combined field is empty
+      // Delivery Agent Name - Bold (single line only)
+      if (deliveryAgent?.name && deliveryAgentY < deliveryAgentMaxY - 10) {
+        doc.setFont('arial', 'bold');
+        doc.setFontSize(10);
+        const nameLines = doc.splitTextToSize(deliveryAgent.name, deliveryAgentMaxWidth);
+        doc.text(nameLines[0], marginX + 5, deliveryAgentY + 2);
+        deliveryAgentY += compactLineSpacing;
+      }
+      
+      // Delivery Agent Address - Normal (single line only)
+      if (deliveryAgent?.address && deliveryAgentY < deliveryAgentMaxY - 6) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const agentAddressLines = doc.splitTextToSize(deliveryAgent.address, deliveryAgentMaxWidth);
+        doc.text(agentAddressLines[0], marginX + 5, deliveryAgentY + 2);
+        deliveryAgentY += compactLineSpacing;
+      }
+      
+      // Delivery Agent Contact - Normal (single line only)
+      if (deliveryAgent?.contactNo && deliveryAgentY < deliveryAgentMaxY - 3) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const telLines = doc.splitTextToSize(`TEL: ${deliveryAgent.contactNo}`, deliveryAgentMaxWidth);
+        doc.text(telLines[0], marginX + 5, deliveryAgentY + 2);
+        deliveryAgentY += compactLineSpacing; 
+      }
+      
+      // Delivery Agent Email - Normal (single line only)
+      if (deliveryAgent?.email && deliveryAgentY < deliveryAgentMaxY) {
+        doc.setFont('arial', 'normal');
+        doc.setFontSize(10);
+        const emailLines = doc.splitTextToSize(`EMAIL: ${deliveryAgent.email}`, deliveryAgentMaxWidth);
+        doc.text(emailLines[0], marginX + 5, deliveryAgentY + 2);
+        deliveryAgentY += compactLineSpacing;
+      }
     }
     
-    // Delivery Agent Contact - Normal (single line only)
-    if (deliveryAgent?.contactNo && deliveryAgentY < deliveryAgentMaxY - 3) {
-      doc.setFont('arial', 'normal');
-      doc.setFontSize(10);
-      const telLines = doc.splitTextToSize(`TEL: ${deliveryAgent.contactNo}`, deliveryAgentMaxWidth);
-      doc.text(telLines[0], marginX + 5, deliveryAgentY + 2);
-      deliveryAgentY += compactLineSpacing; 
-    }
-    
-    // Delivery Agent Email - Normal (single line only)
-    if (deliveryAgent?.email && deliveryAgentY < deliveryAgentMaxY) {
-      doc.setFont('arial', 'bold');
-      doc.setFontSize(10);
-      const emailLines = doc.splitTextToSize(`EMAIL: ${deliveryAgent.email}`, deliveryAgentMaxWidth);
-      doc.text(emailLines[0], marginX + 5, deliveryAgentY + 2);
-    }
-    
-    // Freight section with better alignment
-    doc.text(freightAmount || '2000', colFA_X + 5, bottomBoxTop + 16);
+    // VAT field is now included in the combined delivery agent info field above, so no separate VAT display needed
     
     // Dynamic port selection based on freight payable option
     let freightPayablePort = 'Nhava Sheva'; // default
@@ -1018,11 +1131,21 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       freightPayablePort = podName || 'Nhava Sheva'; // Port of Discharge
     }
     
-    doc.text(freightPayablePort, colFA_X + 5, bottomBoxTop + 34);
+    // Freight section with exchanged positions - freightPayablePort at top, freight amount at bottom
+    doc.text(freightPayablePort, colFA_X + 5, bottomBoxTop + 16);
+    // Show freight amount in bottom position (currently commented as per previous request)
+    // doc.text(freightAmount || '2000', colFA_X + 5, bottomBoxTop + 34);
     
     // Right section - Number of originals and place/date
-    const copyNumberTexts = ['0(ZERO)', '1(ONE)', '2(TWO)'];
-    const copyNumberText = copyNumberTexts[copyNumber] || '0(ZERO)';
+    // For original BLs (all copies), show 3(THREE) as requested
+    let copyNumberText = '3(THREE)';
+    if (blType === 'original') {
+      copyNumberText = '3(THREE)'; // Show 3(THREE) for all original BL copies
+    } else {
+      // For draft and seaway BLs, use the copy number
+      const copyNumberTexts = ['0(ZERO)', '1(ONE)', '2(TWO)'];
+      copyNumberText = copyNumberTexts[copyNumber] || '0(ZERO)';
+    }
     doc.text(`${copyNumberText} ${freightPayablePort}`, rightColX, bottomBoxTop + 16);
     // Horizontal rule just below the copy number/place text within the rightmost section
     doc.line(colNUM_X, bottomBoxTop + 18, colRightEnd, bottomBoxTop + 18);
@@ -1034,15 +1157,15 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     doc.text('As Agent for the Carrier', rightColX, bottomBoxTop + 80);
 
     // Terms block moved below the bottom grid (new section)
-    // Increase terms box height for better fit and alignment
-    // Position terms box closer to the bottom grid to reclaim vertical space
-    // Align the terms box directly under the bottom grid so vertical lines touch without gaps
+    // Calculate dynamic terms box height based on available space
     const termsBoxTop = bottomBoxTop + bottomBoxHeight;
-    const termsBoxHeight = 120; // Further extend height so text stays comfortably inside the section
+    // Calculate remaining space until PDF bottom minus margin
+    const remainingSpace = dynamicPageHeight - 15 - termsBoxTop - 10; // 10mm bottom margin
+    const termsBoxHeight = Math.max(remainingSpace, 40); // Minimum 40mm for terms
     // Draw the top separator only under Delivery Agent + Freight sections (exclude rightmost section)
     doc.line(marginX, termsBoxTop, colNUM_X, termsBoxTop);
     // Extend the middle vertical separator only within the terms box bounds (and not past outer border)
-    const outerBottomY = marginY + pageHeight - 30;
+    const outerBottomY = dynamicPageHeight - 15;
     const termsSeparatorBottomY = Math.min(termsBoxTop + termsBoxHeight, outerBottomY);
     doc.line(colNUM_X, termsBoxTop, colNUM_X, termsSeparatorBottomY);
     // Remove left and right vertical borders of terms box as requested
@@ -1067,11 +1190,9 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
   // Constrain terms text to the left of the new vertical separator
   const miniTermsMaxWidth = Math.max(40, (colNUM_X - (marginX + 9))); 
   
-  // Calculate available height for text to prevent overflow
+  // Calculate available height for text with dynamic dimensions
   const availableHeight = termsBoxHeight - 8; // Leave some margin at bottom
-  // Ensure text never crosses the outer page bottom border
-  const textBottomLimit = (marginY + pageHeight - 28) - 3; // 3mm safety
-  const maxBottomY = Math.min(termsBoxTop + availableHeight, textBottomLimit);
+  const maxBottomY = termsBoxTop + availableHeight;
   
   miniTerms.forEach((t) => {
       // Check if we have space for more text
@@ -1083,11 +1204,9 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       const textBlockHeight = wrapped.length * 2.5 + 0.5;
       if (mtY + textBlockHeight <= maxBottomY) {
         doc.text(wrapped, marginX + 7, mtY); // Slightly indented for alignment
-        // Reduced line spacing from 3.0 + 0.8 to 2.5 + 0.5 for tighter fit
         mtY += textBlockHeight;
       }
-    });    // Remove the interfering lines that were cutting through the text
-    // No additional line reinforcement needed in terms section
+    });
 
     // Removed rightmost stamp cell per request
 
@@ -1114,7 +1233,7 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       doc.setFontSize(10);
       const pageNumberText = `Page ${p} of ${totalPages}`;
       // Keep position consistent with prior single "Page 2" placement
-      doc.text(pageNumberText, pageWidth - 40, pageHeight - 20);
+      doc.text(pageNumberText, pageWidth - 40, dynamicPageHeight - 5);
     }
 
     doc.save(fileName);
