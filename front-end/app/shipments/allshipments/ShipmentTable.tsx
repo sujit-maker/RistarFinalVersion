@@ -225,6 +225,7 @@ const AllShipmentsPage = () => {
 
     // Customer/Company fields
     customerName: '',
+    customerDisplayName: '', // Add display name field
     customerId: '',
     consigneeName: '',
     consigneeId: '',
@@ -239,10 +240,13 @@ const AllShipmentsPage = () => {
     // Product fields
     productId: '',
     productName: '',
+    productDisplayName: '', // Add display name field
 
     // Port fields
     portOfLoading: '',
+    portOfLoadingName: '', // Add display name field
     portOfDischarge: '',
+    portOfDischargeName: '', // Add display name field
     podPortId: '',
     polPortId: '',
     enableTranshipmentPort: false,
@@ -507,6 +511,92 @@ const AllShipmentsPage = () => {
   };
 
   const handleEdit = async (shipment: any) => {
+    // Pre-fetch required data for proper display names
+    let customerName = '';
+    let productDisplayName = '';
+    let consigneeName = '';
+    let shipperName = '';
+    let carrierName = '';
+    let portOfLoadingName = '';
+    let portOfDischargeName = '';
+
+    try {
+      // Fetch customer name
+      if (shipment.custAddressBookId) {
+        const customerRes = await fetch(`http://localhost:8000/addressbook/${shipment.custAddressBookId}`);
+        const customerData = await customerRes.json();
+        customerName = customerData.companyName || '';
+      }
+
+      // Fetch product info
+      if (shipment.productId) {
+        const productRes = await fetch(`http://localhost:8000/products`);
+        const productsData = await productRes.json();
+        const product = productsData.find((p: any) => p.id === shipment.productId);
+        if (product) {
+          productDisplayName = `${product.productId} - ${product.productName} - ${product.productType}`;
+        }
+      }
+
+      // Fetch consignee name
+      if (shipment.consigneeAddressBookId) {
+        const consigneeRes = await fetch(`http://localhost:8000/addressbook/${shipment.consigneeAddressBookId}`);
+        const consigneeData = await consigneeRes.json();
+        consigneeName = consigneeData.companyName || '';
+      }
+
+      // Fetch shipper name
+      if (shipment.shipperAddressBookId) {
+        const shipperRes = await fetch(`http://localhost:8000/addressbook/${shipment.shipperAddressBookId}`);
+        const shipperData = await shipperRes.json();
+        shipperName = shipperData.companyName || '';
+      }
+
+      // Fetch carrier name
+      if (shipment.carrierAddressBookId) {
+        const carrierRes = await fetch(`http://localhost:8000/addressbook/${shipment.carrierAddressBookId}`);
+        const carrierData = await carrierRes.json();
+        carrierName = carrierData.companyName || '';
+      }
+
+      // Fetch port names
+      const portsRes = await fetch("http://localhost:8000/ports");
+      const portsData = await portsRes.json();
+      
+      if (shipment.polPortId) {
+        const polPort = portsData.find((p: any) => p.id === shipment.polPortId);
+        portOfLoadingName = polPort?.portName || '';
+      }
+
+      if (shipment.podPortId) {
+        const podPort = portsData.find((p: any) => p.id === shipment.podPortId);
+        portOfDischargeName = podPort?.portName || '';
+      }
+
+      // Set selected containers with proper port names (using fetched portsData)
+      const existingContainers = shipment.containers?.map((container: any) => {
+        // Find the port info from the fetched ports data
+        const portInfo = portsData.find((port: any) => port.id === container.portId);
+        
+        return {
+          containerNumber: container.containerNumber,
+          capacity: container.capacity,
+          tare: container.tare,
+          inventoryId: container.inventoryId,
+          portId: container.portId,
+          depotName: container.depotName || '',
+          port: portInfo ? { id: portInfo.id, portName: portInfo.portName } : (container.port || null),
+        };
+      }) || [];
+
+      setSelectedContainers(existingContainers);
+
+    } catch (err) {
+      console.error("Failed to fetch data for edit mode:", err);
+      // Set empty containers as fallback
+      setSelectedContainers([]);
+    }
+
     setFormData({
       id: shipment.id,
       status: true,
@@ -522,26 +612,30 @@ const AllShipmentsPage = () => {
 
       // Field names must match what the form expects
       customerName: shipment.custAddressBookId?.toString() || '',
+      customerDisplayName: customerName, // Set the display name
       customerId: shipment.custAddressBookId?.toString() || '',
-      consigneeName: '', // Will be populated by the useEffect in AddShipmentForm
+      consigneeName: consigneeName, // Set the actual name
       consigneeId: shipment.consigneeAddressBookId?.toString() || '',
       consigneeAddressBookId: shipment.consigneeAddressBookId,
-      shipperName: '', // Will be populated by the useEffect in AddShipmentForm
+      shipperName: shipperName, // Set the actual name
       shipperId: shipment.shipperAddressBookId?.toString() || '',
       shipperAddressBookId: shipment.shipperAddressBookId,
       carrierId: shipment.carrierAddressBookId?.toString() || '',
       carrierAddressBookId: shipment.carrierAddressBookId,
-      carrierName: '', // Will be populated by the useEffect in AddShipmentForm
+      carrierName: carrierName, // Set the actual name
       
       // FIX: Ensure productId is passed as number, not string
       productId: shipment.productId || '', // Keep as number/empty string
-      productName: '', // Will be populated by the useEffect in AddShipmentForm
+      productName: productDisplayName, // Set the display name
+      productDisplayName: productDisplayName, // Also set this for the form
 
-      // FIX: Port fields - use the actual port IDs for the select components
+      // FIX: Port fields - use the actual port IDs for the select components and set display names
       polPortId: shipment.polPortId,
       podPortId: shipment.podPortId,
-      portOfLoading: shipment.polPortId?.toString() || '', // Use ID, not name
-      portOfDischarge: shipment.podPortId?.toString() || '', // Use ID, not name
+      portOfLoading: shipment.polPortId?.toString() || '', // Use ID for selection
+      portOfLoadingName: portOfLoadingName, // Set display name for the input field
+      portOfDischarge: shipment.podPortId?.toString() || '', // Use ID for selection
+      portOfDischargeName: portOfDischargeName, // Set display name for the input field
       enableTranshipmentPort: !!shipment.transhipmentPortId,
       transhipmentPortName: shipment.transhipmentPortId?.toString() || '',
       transhipmentPortId: shipment.transhipmentPortId?.toString() || '',
@@ -589,33 +683,6 @@ const AllShipmentsPage = () => {
       // Tank preparation field
       tankPreparation: shipment.tankPreparation || '',
     });
-
-    // Fetch port information for proper port names
-    let portsData = [];
-    try {
-      const portsRes = await fetch("http://localhost:8000/ports");
-      portsData = await portsRes.json();
-    } catch (err) {
-      console.error("Failed to fetch ports for edit mode:", err);
-    }
-
-    // Set selected containers with proper port names
-    const existingContainers = shipment.containers?.map((container: any) => {
-      // Find the port info from the fetched ports data
-      const portInfo = portsData.find((port: any) => port.id === container.portId);
-      
-      return {
-        containerNumber: container.containerNumber,
-        capacity: container.capacity,
-        tare: container.tare,
-        inventoryId: container.inventoryId,
-        portId: container.portId,
-        depotName: container.depotName || '',
-        port: portInfo ? { id: portInfo.id, portName: portInfo.portName } : (container.port || null),
-      };
-    }) || [];
-
-    setSelectedContainers(existingContainers);
 
     setShowModal(true);
   };
@@ -682,12 +749,13 @@ const AllShipmentsPage = () => {
           // First check contacts array for mobile number
           if (primaryDepot?.contacts && Array.isArray(primaryDepot.contacts) && primaryDepot.contacts.length > 0) {
             const firstContact = primaryDepot.contacts[0];
+            // Look specifically for mobile number in contacts
             if (firstContact?.mobileNo) return firstContact.mobileNo;
             if (firstContact?.mobile) return firstContact.mobile;
-            if (firstContact?.phoneNumber) return firstContact.phoneNumber;
+            // Don't use phoneNumber from contacts as it might be landline
           }
-          // If not found in contacts, check direct fields
-          return primaryDepot?.mobile || primaryDepot?.mobileNumber || primaryDepot?.phoneNumber || primaryDepot?.contact || primaryDepot?.phone || '';
+          // If not found in contacts, check direct mobile fields only (avoid phone/contact fields)
+          return primaryDepot?.mobile || primaryDepot?.mobileNumber || '';
         })(),
         containers: shipment.containers || []
       });
@@ -780,24 +848,18 @@ const AllShipmentsPage = () => {
           }
         }));
 
-        // Parse existing BL data back into container-specific fields using the SNAPSHOT saved at first generation
-        const savedContainerNumbers = existingBl.containerNos
-          ? String(existingBl.containerNos)
-              .split(',')
-              .map((s: string) => s.trim())
-              .filter((s: string) => s.length > 0)
-          : [];
+        // Parse existing BL data for weights and seal numbers (preserve these from saved BL)
         const savedSealNumbers = existingBl.sealNo ? String(existingBl.sealNo).split(',').map((s: string) => s.trim()) : [];
         const savedGrossWeights = existingBl.grossWt ? String(existingBl.grossWt).split(',').map((s: string) => s.trim()) : [];
         const savedNetWeights = existingBl.netWt ? String(existingBl.netWt).split(',').map((s: string) => s.trim()) : [];
 
-        // IMPORTANT: Build containers strictly from the saved BL snapshot (do not reflect later shipment edits)
-        const currentContainers = savedContainerNumbers.map((num: string, index: number) => ({
-          containerNumber: num || '',
-          sealNumber: savedSealNumbers[index] || '',
-          grossWt: savedGrossWeights[index] || '',
-          netWt: savedNetWeights[index] || ''
-        }));
+        // CHANGED: Use LATEST shipment containers but preserve saved weights and seal numbers
+        const currentContainers = latestShipment.containers?.map((container: any, index: number) => ({
+          containerNumber: container.containerNumber || '',
+          sealNumber: savedSealNumbers[index] || '', // Preserve saved seal numbers
+          grossWt: savedGrossWeights[index] || '', // Preserve saved gross weights
+          netWt: savedNetWeights[index] || ''  // Preserve saved net weights
+        })) || [];
 
         setBlFormData({
           shipmentId: shipment.id,
@@ -819,7 +881,7 @@ const AllShipmentsPage = () => {
           notifyPartyContactNo: existingBl.notifyPartyContactNo || '',
           notifyPartyEmail: existingBl.notifyPartyEmail || '',
           notifyPartyInfo: existingBl.notifyPartyInfo || '',
-          // Always use the SNAPSHOT container list from the first generation
+          // CHANGED: Use LATEST container list from current shipment
           containerNos: currentContainers.map((c: any) => c.containerNumber).join(', '),
           sealNo: existingBl.sealNo || '',
           grossWt: existingBl.grossWt || '',
@@ -835,11 +897,11 @@ const AllShipmentsPage = () => {
           freightAmount: existingBl.freightAmount || '',
           // Charges and fees field with existing value or empty
           chargesAndFees: existingBl.chargesAndFees || '',
-          // Prefer saved BL snapshot values; fall back to latest shipment only if missing
-          portOfLoading: existingBl.portOfLoading || latestShipment.polPort?.portName || '',
-          portOfDischarge: existingBl.portOfDischarge || latestShipment.podPort?.portName || '',
-          vesselNo: existingBl.vesselNo || latestShipment.vesselName || '',
-          // Container-specific fields - use SNAPSHOT container data
+          // CHANGED: Always use LATEST shipment data for ports and vessel
+          portOfLoading: latestShipment.polPort?.portName || '',
+          portOfDischarge: latestShipment.podPort?.portName || '',
+          vesselNo: latestShipment.vesselName || '',
+          // Container-specific fields - use LATEST container data with preserved weights/seals
           containers: currentContainers
         });
         // Set the flag to true so download button is visible for existing BL
@@ -1220,19 +1282,26 @@ const AllShipmentsPage = () => {
       // Use the saved date from existing BL or current date as fallback
       const formDate = existingBl.date || new Date().toISOString().split('T')[0];
 
-      // Build BL data using the SNAPSHOT saved at first generation (do not reflect later shipment edits)
-      const savedContainerNumbers2 = existingBl.containerNos
-        ? String(existingBl.containerNos).split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-        : [];
+      // Use LATEST container data with preserved BL-specific information
+      const savedSealNumbers = existingBl.sealNo ? String(existingBl.sealNo).split(',').map((s: string) => s.trim()) : [];
+      const savedGrossWeights = existingBl.grossWt ? String(existingBl.grossWt).split(',').map((s: string) => s.trim()) : [];
+      const savedNetWeights = existingBl.netWt ? String(existingBl.netWt).split(',').map((s: string) => s.trim()) : [];
+
+      // Build containers using LATEST shipment data but preserve BL-specific values
+      const latestContainers = latestShipment.containers?.map((container: any, index: number) => ({
+        containerNumber: container.containerNumber || '',
+        sealNumber: savedSealNumbers[index] || '', // Preserve saved seal numbers
+        grossWt: savedGrossWeights[index] || '', // Preserve saved gross weights  
+        netWt: savedNetWeights[index] || ''  // Preserve saved net weights
+      })) || [];
+
       const blDataWithCurrentContainers = {
         ...existingBl,
-        containerNos: savedContainerNumbers2.join(', '),
-        containers: savedContainerNumbers2.map((num: string) => ({
-          containerNumber: num,
-          sealNumber: '',
-          grossWt: '',
-          netWt: ''
-        }))
+        containers: latestContainers, // Use latest containers
+        vesselNo: latestShipment.vesselName || '', // Always use latest vessel name
+        portOfLoading: latestShipment.polPort?.portName || '', // Always use latest port
+        portOfDischarge: latestShipment.podPort?.portName || '', // Always use latest port
+        containerNos: latestContainers.map((c: any) => c.containerNumber).join(', ') // Update container numbers
       };
 
       const pdfData: BLFormData = {
@@ -1301,19 +1370,26 @@ const AllShipmentsPage = () => {
       // Use the saved date from existing BL or current date as fallback
       const formDate = existingBl.date || new Date().toISOString().split('T')[0];
 
-      // Build BL data using the SNAPSHOT saved at first generation (do not reflect later shipment edits)
-      const savedContainerNumbers3 = existingBl.containerNos
-        ? String(existingBl.containerNos).split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-        : [];
+      // Use LATEST container data with preserved BL-specific information
+      const savedSealNumbers = existingBl.sealNo ? String(existingBl.sealNo).split(',').map((s: string) => s.trim()) : [];
+      const savedGrossWeights = existingBl.grossWt ? String(existingBl.grossWt).split(',').map((s: string) => s.trim()) : [];
+      const savedNetWeights = existingBl.netWt ? String(existingBl.netWt).split(',').map((s: string) => s.trim()) : [];
+
+      // Build containers using LATEST shipment data but preserve BL-specific values
+      const latestContainers = latestShipment.containers?.map((container: any, index: number) => ({
+        containerNumber: container.containerNumber || '',
+        sealNumber: savedSealNumbers[index] || '', // Preserve saved seal numbers
+        grossWt: savedGrossWeights[index] || '', // Preserve saved gross weights  
+        netWt: savedNetWeights[index] || ''  // Preserve saved net weights
+      })) || [];
+
       const blDataWithCurrentContainers = {
         ...existingBl,
-        containerNos: savedContainerNumbers3.join(', '),
-        containers: savedContainerNumbers3.map((num: string) => ({
-          containerNumber: num,
-          sealNumber: '',
-          grossWt: '',
-          netWt: ''
-        }))
+        containers: latestContainers, // Use latest containers
+        vesselNo: latestShipment.vesselName || '', // Always use latest vessel name
+        portOfLoading: latestShipment.polPort?.portName || '', // Always use latest port
+        portOfDischarge: latestShipment.podPort?.portName || '', // Always use latest port
+        containerNos: latestContainers.map((c: any) => c.containerNumber).join(', ') // Update container numbers
       };
 
       const pdfData: BLFormData = {
@@ -1410,25 +1486,26 @@ const AllShipmentsPage = () => {
         containers: []
       };
       
-      // Reconstruct container data from saved BL fields
-      const savedContainerNumbers = existingBl.containerNos
-        ? String(existingBl.containerNos).split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-        : [];
+      // Use LATEST container data with preserved BL-specific information
       const savedSealNumbers = existingBl.sealNo ? String(existingBl.sealNo).split(',').map((s: string) => s.trim()) : [];
       const savedGrossWeights = existingBl.grossWt ? String(existingBl.grossWt).split(',').map((s: string) => s.trim()) : [];
       const savedNetWeights = existingBl.netWt ? String(existingBl.netWt).split(',').map((s: string) => s.trim()) : [];
 
-      // Build containers with saved BL data
-      const reconstructedContainers = savedContainerNumbers.map((containerNumber: string, index: number) => ({
-        containerNumber: containerNumber || '',
-        sealNumber: savedSealNumbers[index] || '',
-        grossWt: savedGrossWeights[index] || '',
-        netWt: savedNetWeights[index] || ''
-      }));
+      // Build containers using LATEST shipment data but preserve BL-specific values
+      const latestContainers = latestShipment.containers?.map((container: any, index: number) => ({
+        containerNumber: container.containerNumber || '',
+        sealNumber: savedSealNumbers[index] || '', // Preserve saved seal numbers
+        grossWt: savedGrossWeights[index] || '', // Preserve saved gross weights  
+        netWt: savedNetWeights[index] || ''  // Preserve saved net weights
+      })) || [];
 
       const blDataWithCurrentContainers = {
         ...existingBl,
-        containers: reconstructedContainers
+        containers: latestContainers, // Use latest containers
+        vesselNo: latestShipment.vesselName || '', // Always use latest vessel name
+        portOfLoading: latestShipment.polPort?.portName || '', // Always use latest port
+        portOfDischarge: latestShipment.podPort?.portName || '', // Always use latest port
+        containerNos: latestContainers.map((c: any) => c.containerNumber).join(', ') // Update container numbers
       };
       
       await generateBlPdf(blType, pdfData, blDataWithCurrentContainers, 0); // 0 = original copy
@@ -1507,6 +1584,7 @@ const AllShipmentsPage = () => {
 
               // Customer/Company fields
               customerName: '',
+              customerDisplayName: '', // Add display name field
               customerId: '',
               consigneeName: '',
               consigneeId: '',
@@ -1521,10 +1599,13 @@ const AllShipmentsPage = () => {
               // Product fields
               productId: '',
               productName: '',
+              productDisplayName: '', // Add display name field
 
               // Port fields
               portOfLoading: '',
+              portOfLoadingName: '', // Add display name field
               portOfDischarge: '',
+              portOfDischargeName: '', // Add display name field
               podPortId: '',
               polPortId: '',
               enableTranshipmentPort: false,

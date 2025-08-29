@@ -90,7 +90,9 @@ export async function generateBlPdf(
       // If more than 3 containers, they go to a separate page
       totalHeight += 50; // Just the notice text
     } else {
-      totalHeight += Math.max(50, containersToShow.length * 15); // Variable height based on containers
+      // More dynamic height calculation: base 50mm + more space per container (converted to mm)
+      const containerHeightMm = Math.max(60, 60 + (containersToShow.length * 20)); // Increased base and per-container space
+      totalHeight += containerHeightMm;
     }
     
     // Bottom section (delivery agent, freight, etc.): ~50mm
@@ -769,15 +771,16 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
         containersToShow.forEach((container: any, index: number) => {
           if (!container.containerNumber) return;
           
-          const yPos = containerStartY + (index * 45); // 45px spacing between containers
+          const yPos = containerStartY + (index * 40); // Reduced from 45 to 40px spacing between containers
           
-          // Container number
+          // Container number - reduced font size
           doc.setFont('arial', 'normal');
-          doc.setFontSize(10);
+          doc.setFontSize(9); // Reduced from 10 to 9
           doc.text(container.containerNumber || 'N/A', containerStartX, yPos);
           
-          // Seal number
-          doc.text(`SEAL NO: ${container.sealNumber || 'N/A'}`, containerStartX, yPos + 8);
+          // Seal number - reduced font size and spacing
+          doc.setFontSize(8); // Reduced from default to 8
+          doc.text(`SEAL NO: ${container.sealNumber || 'N/A'}`, containerStartX, yPos + 7); // Reduced from 8 to 7
           
           // Weights for each container
           const grossWtNum = parseFloat(container.grossWt) || 0;
@@ -788,14 +791,15 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
           const grossWt = container.grossWt ? `${container.grossWt} KGS` : 'N/A';
           const netWt = container.netWt ? `${container.netWt} KGS` : 'N/A';
           
-          doc.text(`GROSS WT: ${grossWt}`, containerStartX, yPos + 16);
-          doc.text(`NET WT: ${netWt}`, containerStartX, yPos + 24);
+          // Reduced spacing and font size for weights
+          doc.text(`GROSS WT: ${grossWt}`, containerStartX, yPos + 14); // Reduced from 16 to 14
+          doc.text(`NET WT: ${netWt}`, containerStartX, yPos + 21); // Reduced from 24 to 21
           
           // No separator lines between containers
         });
         
-        // Update containerY to position after vertical containers
-        containerY = containerStartY + (containersToShow.length * 45) + 10;
+        // Update containerY to position after vertical containers with proper spacing
+        containerY = containerStartY + (containersToShow.length * 40) + 25; // Updated to match reduced container spacing
         
         // No totals display for 3 or fewer containers as per user request
         
@@ -945,9 +949,9 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     const freightText = freightPayableAt === 'prepaid' ? '"FREIGHT PREPAID"' : 
                        freightPayableAt === 'postpaid' ? '"FREIGHT POSTPAID"' : '"FREIGHT PREPAID"';
     
-    // Get free days and detention rate from shipment data
-    const freeDays = shipment?.polFreeDays || shipment?.podFreeDays || '';
-    const detentionRate = shipment?.polDetentionRate || shipment?.podDetentionRate || '';
+    // Get free days and detention rate from shipment data - Use only POD (destination port) values
+    const freeDays = shipment?.podFreeDays || '';
+    const detentionRate = shipment?.podDetentionRate || '';
     
     // Additional block under description - improved spacing and alignment
     let addY = firstRowTextY + 50;

@@ -433,7 +433,7 @@ model Shipment {
   podDetentionRate              String
   quantity                      String
   vesselName                    String
-  gsDate                        DateTime
+  gsDate                        DateTime?
   sob                           DateTime?
   etaTopod                      DateTime
   estimateDate                  DateTime
