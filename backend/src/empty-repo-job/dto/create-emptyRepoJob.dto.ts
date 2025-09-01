@@ -75,18 +75,21 @@ export class CreateEmptyRepoJobDto {
   @IsString()
   vesselName: string;
 
+  @IsOptional()
   @IsDateString()
-  gsDate: string;
+  gsDate?: string;
 
   @IsOptional()
   @IsDateString()
   sob?: string;
 
+  @IsOptional()
   @IsDateString()
-  etaTopod: string;
+  etaTopod?: string;
 
+  @IsOptional()
   @IsDateString()
-  estimateDate: string;
+  estimateDate?: string;
 
   @IsArray()
   @ValidateNested({ each: true })

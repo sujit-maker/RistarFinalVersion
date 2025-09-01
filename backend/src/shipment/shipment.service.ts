@@ -46,8 +46,8 @@ async create(data: CreateShipmentDto) {
 
   const { containers, ...otherData } = data;
 
-  const parseDate = (d: string | Date | undefined) =>
-    d ? new Date(d).toISOString() : new Date().toISOString();
+  const parseDateOrUndefined = (d: string | Date | undefined) =>
+    d ? new Date(d).toISOString() : undefined;
 
   // Generate jobNumber before transaction
   const generatedJobNumber = await this.getNextJobNumber();
@@ -58,10 +58,11 @@ async create(data: CreateShipmentDto) {
       ...otherData, // This spreads all the other fields
       houseBL: generatedHouseBL,
       jobNumber: generatedJobNumber,
-      date: parseDate(data.date),
-      gsDate: parseDate(data.gsDate),
-      etaTopod: parseDate(data.etaTopod),
-      estimateDate: parseDate(data.estimateDate),
+      // 'date' is required; if not provided, fallback to now, but optional fields remain empty
+      date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
+      gsDate: data.gsDate ? new Date(data.gsDate).toISOString() : null,
+      etaTopod: data.etaTopod ? new Date(data.etaTopod).toISOString() : null,
+      estimateDate: data.estimateDate ? new Date(data.estimateDate).toISOString() : null,
     };
 
     // Handle SOB date conditionally - only set if provided

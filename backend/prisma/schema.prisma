@@ -435,8 +435,8 @@ model Shipment {
   vesselName                    String
   gsDate                        DateTime?
   sob                           DateTime?
-  etaTopod                      DateTime
-  estimateDate                  DateTime
+  etaTopod                      DateTime?
+  estimateDate                  DateTime?
   createdAt                     DateTime            @default(now())
   updatedAt                     DateTime            @updatedAt
   hasCroGenerated               Boolean             @default(false)
@@ -488,12 +488,14 @@ model EmptyRepoJob {
   podDetentionRate              String
   quantity                      String
   vesselName                    String
-  gsDate                        DateTime
+  gsDate                        DateTime?
   sob                           DateTime?
-  etaTopod                      DateTime
-  estimateDate                  DateTime
+  etaTopod                      DateTime?
+  estimateDate                  DateTime?
   createdAt                     DateTime                @default(now())
   updatedAt                     DateTime                @updatedAt
+  hasCroGenerated               Boolean                 @default(false)
+  firstCroGenerationDate        DateTime?
   carrierAddressBook            AddressBook?            @relation("ShipmentCarrier", fields: [carrierAddressBookId], references: [id])
   emptyReturnDepotAddressBook   AddressBook?            @relation("ShipmentEmptyReturn", fields: [emptyReturnDepotAddressBookId], references: [id])
   expHandlingAgentAddressBook   AddressBook?            @relation("ShipmentExportHandling", fields: [expHandlingAgentAddressBookId], references: [id])
@@ -646,4 +648,3 @@ model AuditLog {
   @@index([actorId])
   @@index([action])
 }
-

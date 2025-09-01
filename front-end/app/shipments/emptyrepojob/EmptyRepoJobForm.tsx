@@ -292,11 +292,11 @@ const AddShipmentModal = ({
         quantity: form.quantity || selectedContainers.length.toString(),
         carrierAddressBookId: parseInt(form.carrierId),
         vesselName: form.vesselName || "Default Vessel",
-        gsDate: form.gateClosingDate || new Date().toISOString(),
+        gsDate: form.gateClosingDate ? new Date(form.gateClosingDate).toISOString() : undefined,
         sob: form.sobDate || null,
-        etaTopod: form.etaToPod || new Date().toISOString(),
+        etaTopod: form.etaToPod ? new Date(form.etaToPod).toISOString() : undefined,
         emptyReturnDepotAddressBookId: parseInt(form.emptyReturnDepot),
-        estimateDate: form.estimatedEmptyReturnDate || new Date().toISOString(),
+        estimateDate: form.estimatedEmptyReturnDate ? new Date(form.estimatedEmptyReturnDate).toISOString() : undefined,
 
         // Include containers array
         containers: selectedContainers.map((c: any) => ({

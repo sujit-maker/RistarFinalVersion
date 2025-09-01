@@ -96,21 +96,24 @@ export class CreateShipmentDto {
   @IsString()
   vesselName: string;
 
+  @IsOptional()
   @IsDateString()
-  gsDate: string;
+  gsDate?: string;
 
   @IsOptional()
   @IsDateString()
   sob?: string;
 
+  @IsOptional()
   @IsDateString()
-  etaTopod: string;
+  etaTopod?: string;
 
   @IsInt()
   emptyReturnDepotAddressBookId: number;
 
+  @IsOptional()
   @IsDateString()
-  estimateDate: string;
+  estimateDate?: string;
 
   @IsOptional()
   @IsString()

@@ -1281,7 +1281,7 @@ const AddShipmentModal = ({
         payload.tankPreparation = form.tankPreparation;
       }
 
-      // Date fields - use current date as fallback
+      // Date fields - only set if provided by user
       if (form.gateClosingDate)
         payload.gsDate = new Date(form.gateClosingDate).toISOString();
       if (form.sobDate) payload.sob = new Date(form.sobDate).toISOString();
@@ -1821,6 +1821,8 @@ const AddShipmentModal = ({
                           setValidationErrors(prev => ({...prev, date: ""}));
                         }
                       }}
+                      autoComplete="off"
+                      placeholder=""
                       className="w-full p-2.5 bg-white text-gray-900 dark:bg-neutral-800 dark:text-white rounded border border-neutral-200 dark:border-neutral-700"
                     />
                     {validationErrors.date && (
@@ -2839,7 +2841,7 @@ const AddShipmentModal = ({
               </div>
               <div className="w-full p-2 bg-white dark:bg-neutral-900 rounded border border-neutral-200 dark:border-neutral-800">
                 <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                  <div className="relative">
+                  <div className="relative">  
                     <Label
                       htmlFor="carrierName"
                       className="text-gray-900 dark:text-neutral-200 text-sm mb-1"
@@ -2941,6 +2943,8 @@ const AddShipmentModal = ({
                       onChange={(e) =>
                         setForm({ ...form, gateClosingDate: e.target.value })
                       }
+                      autoComplete="off"
+                      placeholder=""
                       className="w-full p-2.5 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white rounded border border-neutral-200 dark:border-neutral-700"
                     />
                   </div>
@@ -2958,6 +2962,7 @@ const AddShipmentModal = ({
                       onChange={(e) =>
                         setForm({ ...form, sobDate: e.target.value })
                       }
+                      autoComplete="off"
                       className="w-full p-2.5 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white rounded border border-neutral-200 dark:border-neutral-700"
                     />
                   </div>
@@ -2975,6 +2980,8 @@ const AddShipmentModal = ({
                       onChange={(e) =>
                         setForm({ ...form, etaToPod: e.target.value })
                       }
+                      autoComplete="off"
+                      placeholder=""
                       className="w-full p-2.5 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white rounded border border-neutral-200 dark:border-neutral-700"
                     />
                   </div>
@@ -3060,6 +3067,7 @@ const AddShipmentModal = ({
                           estimatedEmptyReturnDate: e.target.value,
                         })
                       }
+                      autoComplete="off"
                       className="w-full p-2.5 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white rounded border border-neutral-200 dark:border-neutral-700"
                     />
                   </div>

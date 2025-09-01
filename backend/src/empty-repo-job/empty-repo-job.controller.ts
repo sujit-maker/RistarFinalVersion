@@ -6,7 +6,8 @@ import {
   Patch,
   Param,
   Delete,
-  UseGuards
+  UseGuards,
+  ParseIntPipe
 } from '@nestjs/common';
 import { EmptyRepoJobService } from './empty-repo-job.service';
 import { CreateEmptyRepoJobDto } from './dto/create-emptyRepoJob.dto';
@@ -50,5 +51,11 @@ export class EmptyRepoJobController {
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.service.remove(+id);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Post('mark-cro-generated/:id')
+  markCroGenerated(@Param('id', ParseIntPipe) id: number) {
+    return this.service.markCroGenerated(id);
   }
 }

@@ -89,9 +89,13 @@ export async function generateBlPdf(
     if (containersToShow.length > 3) {
       // If more than 3 containers, they go to a separate page
       totalHeight += 50; // Just the notice text
+    } else if (containersToShow.length === 1) {
+      // For 1 container, keep the current height calculation
+      const containerHeightMm = Math.max(60, 60 + (1 * 20)); // 80mm for single container
+      totalHeight += containerHeightMm;
     } else {
-      // More dynamic height calculation: base 50mm + more space per container (converted to mm)
-      const containerHeightMm = Math.max(60, 60 + (containersToShow.length * 20)); // Increased base and per-container space
+      // For 2 and 3 containers, reduce height to minimize empty space
+      const containerHeightMm = 60 + (containersToShow.length * 5); // Further reduced from 8 to 5mm per container
       totalHeight += containerHeightMm;
     }
     
@@ -119,11 +123,17 @@ export async function generateBlPdf(
   
   const dynamicPageHeight = calculateRequiredHeight();
   
-  // Create PDF with A3 width and calculated dynamic height
-  const doc = new jsPDF('p', 'mm', [297, dynamicPageHeight]);
+      // Create PDF with A3 width and calculated dynamic height
+    const doc = new jsPDF('p', 'mm', [297, dynamicPageHeight]);
 
-  try {
-    // Fetch shipment data for additional info like ports and vessel details
+    // Get container count early for dynamic positioning calculations
+    const containersToShow = (blFormData?.containers && blFormData.containers.length > 0) 
+      ? blFormData.containers 
+      : [];
+    const actualContainerCount = containersToShow.length;
+
+    try {
+      // Fetch shipment data for additional info like ports and vessel details
     console.log("Starting BL PDF generation for shipment:", formData.shipmentId);
     const [shipmentRes, addressBooksRes, productsRes] = await Promise.all([
       axios.get(`http://localhost:8000/shipment/${formData.shipmentId}`),
@@ -259,9 +269,13 @@ export async function generateBlPdf(
     doc.setLineWidth(0.5);
     // Draw outer border with calculated dimensions
     doc.line(marginX, marginY, marginX + contentWidth, marginY); // top
-    doc.line(marginX, marginY, marginX, dynamicPageHeight - 15); // left
-    doc.line(marginX + contentWidth, marginY, marginX + contentWidth, dynamicPageHeight - 15); // right
-    doc.line(marginX, dynamicPageHeight - 15, marginX + contentWidth, dynamicPageHeight - 15); // bottom
+    
+    // Track border positions - will be updated after terms section is calculated
+    let bottomBorderY = dynamicPageHeight - 15; // Default position
+    let leftBorderY = bottomBorderY; // Track left border position
+    let rightBorderY = bottomBorderY; // Track right border position
+    // Vertical borders will be drawn later after calculating correct position
+    // Bottom border will be drawn later after calculating correct position
     
     // Header big box and split column like first image
     // Move header up to overlap the outer border top (removes the top gap/second line)
@@ -678,7 +692,7 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     const colRightX = marginX + 190;
     // No vertical/horizontal lines for the container section as requested
     const firstRowTextY = tableHeaderY + 8;
-    let rowEndY = firstRowTextY + 50; // reduced to tighten layout
+    let rowEndY = firstRowTextY + 50; // initial value, will be updated after containers are positioned
     // Header bottom line
     // No header underline
 
@@ -689,10 +703,7 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // Display all containers with their details vertically with pagination support
     let containerY = firstRowTextY + 6;
     const maxYOnPage = 250; // Maximum Y coordinate before needing a new page
-    const containerSpacing = 12; // Height needed for each container row in table format    // Determine which containers to use
-    const containersToShow = (blFormData?.containers && blFormData.containers.length > 0) 
-      ? blFormData.containers 
-      : containers;
+    const containerSpacing = 12; // Height needed for each container row in table format
     
     // NEW LOGIC: If more than 3 containers, move ALL containers to next page
     const shouldMoveAllContainersToNextPage = containersToShow.length > 3;
@@ -702,6 +713,9 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       doc.setFont('arial', 'bold');
       doc.setFontSize(10);
       doc.text('Find the containers details list below the page annexure.', marginX + 5, containerY + 30);
+      
+      // Update rowEndY to account for the message space
+      rowEndY = Math.max(rowEndY, containerY + 20);
       
       // Add new page for all containers
       doc.addPage();
@@ -773,14 +787,14 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
           
           const yPos = containerStartY + (index * 40); // Reduced from 45 to 40px spacing between containers
           
-          // Container number - reduced font size
+          // Container number - increased font size for better readability
           doc.setFont('arial', 'normal');
-          doc.setFontSize(9); // Reduced from 10 to 9
+          doc.setFontSize(11); // Increased from 9 to 11 for better readability
           doc.text(container.containerNumber || 'N/A', containerStartX, yPos);
           
-          // Seal number - reduced font size and spacing
-          doc.setFontSize(8); // Reduced from default to 8
-          doc.text(`SEAL NO: ${container.sealNumber || 'N/A'}`, containerStartX, yPos + 7); // Reduced from 8 to 7
+          // Seal number - increased font size for better readability
+          doc.setFontSize(10); // Increased from 8 to 10 for better readability
+          doc.text(`SEAL NO: ${container.sealNumber || 'N/A'}`, containerStartX, yPos + 7);
           
           // Weights for each container
           const grossWtNum = parseFloat(container.grossWt) || 0;
@@ -791,15 +805,19 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
           const grossWt = container.grossWt ? `${container.grossWt} KGS` : 'N/A';
           const netWt = container.netWt ? `${container.netWt} KGS` : 'N/A';
           
-          // Reduced spacing and font size for weights
-          doc.text(`GROSS WT: ${grossWt}`, containerStartX, yPos + 14); // Reduced from 16 to 14
-          doc.text(`NET WT: ${netWt}`, containerStartX, yPos + 21); // Reduced from 24 to 21
+          // Increased font size for weights for better readability
+          doc.setFontSize(10); // Increased from 8 to 10 for better readability
+          doc.text(`GROSS WT: ${grossWt}`, containerStartX, yPos + 14);
+          doc.text(`NET WT: ${netWt}`, containerStartX, yPos + 21);
           
           // No separator lines between containers
         });
         
         // Update containerY to position after vertical containers with proper spacing
         containerY = containerStartY + (containersToShow.length * 40) + 25; // Updated to match reduced container spacing
+        
+        // Update rowEndY to account for actual space used by containers
+        rowEndY = Math.max(rowEndY, containerY);
         
         // No totals display for 3 or fewer containers as per user request
         
@@ -983,10 +1001,13 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     if (blFormData?.chargesAndFees && blFormData.chargesAndFees.trim()) {
       // If chargesAndFees field has content, use it directly
       chargeLines = [
-        '"SHIPPING LINE /SHIPPING LINE AGENTS ARE ELIGIBLE UNDER THIS B/L TERMS, TO',
-        'COLLECT CHARGES SUCH AS',
-        blFormData.chargesAndFees
+        "SHIPPING LINE /SHIPPING LINE AGENTS ARE ELIGIBLE UNDER THIS B/L TERMS, TO",
+        "COLLECT CHARGES SUCH AS"
       ];
+      
+      // Split chargesAndFees by line breaks and add each line separately
+      const chargesLines = blFormData.chargesAndFees.split('\n').filter((line: string) => line.trim());
+      chargeLines.push(...chargesLines);
     } else {
       // If empty, don't show any charges (as requested)
       chargeLines = [];
@@ -998,15 +1019,17 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       if ((doc as any).setCharSpace) { 
         (doc as any).setCharSpace(0); 
       }
-      // Use splitTextToSize to handle wrapping but render line by line to avoid justification
-      const wrappedLines = doc.splitTextToSize(normalized, 78);
       
-      // Render each wrapped line individually with no special options
-      wrappedLines.forEach((line: string, lineIndex: number) => {
-        doc.text(line.trim(), marginX + 110, addY + (lineIndex * 3.5));
-      });
-      
-      addY += wrappedLines.length * 3.5 + 2;
+      // For charges and fees, render each line directly without wrapping to preserve line breaks
+      if (t.includes('SHIPPING LINE') || t.includes('COLLECT CHARGES')) {
+        // These are the header lines, render them as is
+        doc.text(normalized, marginX + 110, addY);
+        addY += 3.5;
+      } else {
+        // These are the charges lines from textarea, render each line separately
+        doc.text(normalized, marginX + 110, addY);
+        addY += 3.5;
+      }
     });
 
     rowEndY = Math.max(rowEndY, addY);
@@ -1020,9 +1043,40 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // Removed extra separator line before bottom section to avoid double lines
 
     // Bottom grid box (no BL SURRENDERED text)
-    const bottomBoxTop = tableBottomY + 4; // Reduced from 8 to 4 to save space
+    // Move bottom section down for single container to prevent freight prepaid text overflow
+    let bottomBoxTop = tableBottomY - 10; // Default position
+    if (actualContainerCount === 1) {
+      bottomBoxTop = tableBottomY + 15; // Move down 25mm for single container to create more space above
+    } else if (actualContainerCount === 2) {
+      bottomBoxTop = tableBottomY + 5; // Move down 15mm for two containers to provide more space for charges and fees section
+    }
     // Reduced height to free more space for the terms section below
     const bottomBoxHeight = 48; // Reduced from 52 to 48
+    
+    // Calculate terms section positioning early for border calculations
+    const termsBoxTop = bottomBoxTop + bottomBoxHeight;
+    const termsBoxHeight = 50; // Increased height to accommodate all terms text content
+    
+    // Update bottom border position based on container count and fixed terms section height
+    if (actualContainerCount === 1) {
+      bottomBorderY = termsBoxTop + termsBoxHeight - 3; // Move up for single container to reduce empty space
+    } else if (actualContainerCount === 2) {
+      bottomBorderY = termsBoxTop + termsBoxHeight; // Keep current position for two containers
+    } else {
+      bottomBorderY = termsBoxTop + termsBoxHeight - 6; // Move up 5mm for three containers to reduce empty space
+    }
+  
+    // Now draw the bottom border at the correct position
+    doc.line(marginX, bottomBorderY, marginX + contentWidth, bottomBorderY); // bottom
+    
+    // Update left and right borders to match the new bottom position
+    leftBorderY = bottomBorderY;
+    rightBorderY = bottomBorderY;
+    
+    // Now draw the left and right vertical borders at the correct position
+    doc.line(marginX, marginY, marginX, leftBorderY); // left
+    doc.line(marginX + contentWidth, marginY, marginX + contentWidth, rightBorderY); // right
+    
     doc.setLineWidth(0.5);
     // Draw bottom box without bottom edge so there is only one line between this box and the terms box below
     // left vertical
@@ -1117,7 +1171,7 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       
       // Delivery Agent Email - Normal (single line only)
       if (deliveryAgent?.email && deliveryAgentY < deliveryAgentMaxY) {
-        doc.setFont('arial', 'normal');
+        doc.setFont('arial', 'bold');
         doc.setFontSize(10);
         const emailLines = doc.splitTextToSize(`EMAIL: ${deliveryAgent.email}`, deliveryAgentMaxWidth);
         doc.text(emailLines[0], marginX + 5, deliveryAgentY + 2);
@@ -1157,26 +1211,36 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // Place and date of issue - right aligned with extra padding from border
     doc.text(blDate, rightSectionRight, bottomBoxTop + 16, { align: 'right' });
     doc.text('For RISTAR LOGISTICS PVT LTD', rightColX, bottomBoxTop + 28);
-    // Add "As Agent for the Carrier" below the company line inside the rightmost section
-    doc.text('As Agent for the Carrier', rightColX, bottomBoxTop + 80);
+    
+    // Dynamic positioning for "As Agent for the Carrier" based on container count
+    // Move it down much closer to the bottom line for all container counts
+    let asAgentY = bottomBoxTop + 40; // Base position
+    if (actualContainerCount === 1) {
+      // For 1-container PDFs, move it down significantly more for better visual balance
+      asAgentY = bottomBoxTop + 90; // Move down 50mm more than base position
+    } else if (actualContainerCount === 2) {
+      // For 2-container PDFs, move it down more for better balance
+      asAgentY = bottomBoxTop + 85; // Move down 45mm more than base position
+    } else if (actualContainerCount === 3) {
+      // For 3-container PDFs, move it down for better balance
+      asAgentY = bottomBoxTop + 80; // Move down 40mm more than base position
+    }
+    
+    // Add "As Agent for the Carrier" with dynamic positioning
+    doc.text('As Agent for the Carrier', rightColX, asAgentY);
 
     // Terms block moved below the bottom grid (new section)
-    // Calculate dynamic terms box height based on available space
-    const termsBoxTop = bottomBoxTop + bottomBoxHeight;
-    // Calculate remaining space until PDF bottom minus margin
-    const remainingSpace = dynamicPageHeight - 15 - termsBoxTop - 10; // 10mm bottom margin
-    const termsBoxHeight = Math.max(remainingSpace, 40); // Minimum 40mm for terms
+    // Using fixed terms box height calculated earlier
     // Draw the top separator only under Delivery Agent + Freight sections (exclude rightmost section)
     doc.line(marginX, termsBoxTop, colNUM_X, termsBoxTop);
-    // Extend the middle vertical separator only within the terms box bounds (and not past outer border)
-    const outerBottomY = dynamicPageHeight - 15;
-    const termsSeparatorBottomY = Math.min(termsBoxTop + termsBoxHeight, outerBottomY);
-    doc.line(colNUM_X, termsBoxTop, colNUM_X, termsSeparatorBottomY);
+    // Extend the middle vertical separator to match the bottom border position
+    doc.line(colNUM_X, termsBoxTop, colNUM_X, bottomBorderY);
     // Remove left and right vertical borders of terms box as requested
   // Omit bottom edge of terms box so only the outer page border shows at the end
   // Reduce top padding so the first line starts higher (closer to the separator line)
   // Add some spacing from the top separator before the terms text begins
   const miniTermsY = termsBoxTop + 4; // Reduced padding from 6 to 4
+  doc.setFont('arial', 'bold'); // Set font to bold for terms text
   doc.setFontSize(7); // Further reduced from 7 to 6 for better fit inside the section
   const miniTerms = [
       'By accepting this Bill of lading shipper accepts and abides by all terms, conditions clauses printed and stamped on the face or reverse side of this bill of lading.',
@@ -1187,15 +1251,15 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       'The carrier reserves the right to repack the goods if the same are not in seaworthy packing.The packing condition will be certified by the local bonded',
       'warehouse of competent surveyor , and the shipper by virtue of accepting this bill of lading accepts the liability towards the cost for the same.',
       'For shipments where inland trucking is involved it is mandatory on consignee to custom clear the shipment at port of discharge.',
-      'In case of any discrepancy found in declared weight & volume the carrier reserve the right to hold the shipment & recover all charges as per the revised weight&',
-      'volume whichever is high from shipper or consignee.'
+      'In case of any discrepancy found in declared weight & volume the carrier reserve the right to hold the shipment & recover all charges as per the revised weight & volume whichever is high from shipper or consignee.'
+      
     ];
     let mtY = miniTermsY; 
   // Constrain terms text to the left of the new vertical separator
   const miniTermsMaxWidth = Math.max(40, (colNUM_X - (marginX + 9))); 
   
-  // Calculate available height for text with dynamic dimensions
-  const availableHeight = termsBoxHeight - 8; // Leave some margin at bottom
+  // Fixed height for terms text to match the fixed section height
+  const availableHeight = 50; // Fixed height that fits within the 50mm section height
   const maxBottomY = termsBoxTop + availableHeight;
   
   miniTerms.forEach((t) => {
@@ -1214,18 +1278,30 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
 
     // Removed rightmost stamp cell per request
 
-    // Save the PDF
+    // Save the PDF with dynamic port names from shipment data
     let fileName = "";
     const copySuffix = copyNumber === 0 ? '' : copyNumber === 1 ? '_2nd_Copy' : '_3rd_Copy';
+    
+    // Get port codes from shipment data for dynamic filename
+    const polPortCode = shipment.polPort?.portCode || 'NSA';
+    const podPortCode = shipment.podPort?.portCode || 'JEV';
+    
+    // Use the actual port codes (3-letter abbreviations) for filename
+    const polCode = polPortCode.substring(0, 3).toUpperCase();
+    const podCode = podPortCode.substring(0, 3).toUpperCase();
+    
+    // Create filename with POL first, then POD (matching the actual shipment route)
+    const portCode = `${polCode}${podCode}`;
+    
     switch (blType) {
       case 'original':
-        fileName = `RST_NSAJEA_25_00001_Original_BL${copySuffix}.pdf`;
+        fileName = `RST_${portCode}_25_00001_Original_BL${copySuffix}.pdf`;
         break;
       case 'draft':
-        fileName = `RST_NSAJEA_25_00001_Draft_BL${copySuffix}.pdf`;
+        fileName = `RST_${portCode}_25_00001_Draft_BL${copySuffix}.pdf`;
         break;
       case 'seaway':
-        fileName = `RST_NSAJEA_25_00001_Seaway_BL${copySuffix}.pdf`;
+        fileName = `RST_${portCode}_25_00001_Seaway_BL${copySuffix}.pdf`;
         break;
     }
 

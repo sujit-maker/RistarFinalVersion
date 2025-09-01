@@ -129,7 +129,7 @@ const AllShipmentsPage = () => {
   const [showCroModal, setShowCroModal] = useState(false);
   const [croFormData, setCroFormData] = useState({
     shipmentId: 0,
-    date: new Date().toISOString().split('T')[0], // Fixed current date
+    date: '', // Will be set only if user fills it or uses existing date
     houseBL: '',
     shipperRefNo: '',
     shipper: '',
@@ -206,7 +206,7 @@ const AllShipmentsPage = () => {
     shipmentId: 0,
     blType: 'original' as BLType,
     // Add date field for BL generation
-    date: new Date().toISOString().split('T')[0]
+    date: '' // Will be set only if user fills it or uses existing date
   });
 
   // Add state for allMovements
@@ -220,7 +220,7 @@ const AllShipmentsPage = () => {
     masterBL: '',
     houseBL: '', // Add houseBL field
     shippingTerm: '',
-    date: new Date().toISOString().split('T')[0],
+    date: '', // Will be set only if user fills it or uses existing date
     jobNumber: '',
 
     // Customer/Company fields
@@ -731,7 +731,7 @@ const AllShipmentsPage = () => {
       // Pre-fill form data with current shipment data
       setCroFormData({
         shipmentId: shipment.id,
-        date: new Date().toISOString().split('T')[0], // Fixed current date
+        date: '', // Will be filled by user as needed
         houseBL: shipment.houseBL || shipment.masterBL || '',
         shipperRefNo: shipment.refNumber || '',
         shipper: shipper?.companyName || '',
@@ -793,11 +793,11 @@ const AllShipmentsPage = () => {
   // Handle downloading PDF with current form data and consistent date logic
   const handleDownloadCroPdf = async () => {
     try {
-      // Get the consistent date from generation status or use current date as fallback
+      // Get the consistent date from generation status or use provided date
       const generationStatus = croGenerationStatus[croFormData.shipmentId];
       const formDate = generationStatus?.firstCroGenerationDate 
         ? new Date(generationStatus.firstCroGenerationDate).toISOString().split('T')[0]
-        : new Date().toISOString().split('T')[0];
+        : croFormData.date || new Date().toISOString().split('T')[0]; // Use provided date or fallback to current
 
       // Mark CRO as generated and capture first generation date if not already done
       const response = await apiFetch(`http://localhost:8000/shipment/mark-cro-generated/${croFormData.shipmentId}`, {
@@ -1579,7 +1579,7 @@ const AllShipmentsPage = () => {
               masterBL: '',
               houseBL: '', // Add houseBL field
               shippingTerm: '',
-              date: new Date().toISOString().split('T')[0],
+              date: '', // Will be filled by user as needed
               jobNumber: '',
 
               // Customer/Company fields
@@ -1855,7 +1855,7 @@ const AllShipmentsPage = () => {
                                       size={16} 
                                       className="text-green-600 hover:text-green-700 cursor-pointer" 
                                       onClick={(e) => {
-                                        e.stopPropagation();
+                                        e.stopPropagation();  
                                         handleDirectBlDownload(shipment.id, 'seaway');
                                       }}
 

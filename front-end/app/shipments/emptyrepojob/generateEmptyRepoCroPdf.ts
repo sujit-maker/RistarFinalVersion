@@ -33,8 +33,8 @@ function addTextWithSpacing(
   doc.text(value, x + labelWidth, y);
 }
 
-export async function generateCroPdf(
-  shipmentId: number,
+export async function generateEmptyRepoCroPdf(
+  emptyRepoJobId: number,
   selectedContainers: any[],
   providedDate?: string
 ) {
@@ -43,29 +43,33 @@ export async function generateCroPdf(
 
   try {
     // Validate input parameters
-    if (!shipmentId || !selectedContainers || selectedContainers.length === 0) {
+    if (
+      !emptyRepoJobId ||
+      !selectedContainers ||
+      selectedContainers.length === 0
+    ) {
       console.error(
-        "Invalid parameters: shipmentId or selectedContainers missing"
+        "Invalid parameters: emptyRepoJobId or selectedContainers missing"
       );
       return;
     }
 
-    console.log("Starting PDF generation for shipment:", shipmentId);
+    console.log("Starting PDF generation for empty repo job:", emptyRepoJobId);
     const [
-      shipmentRes,
+      emptyRepoJobRes,
       addressBooksRes,
       productsRes,
       inventoryRes,
       movementHistoryRes,
     ] = await Promise.all([
-      axios.get(`http://localhost:8000/shipment/${shipmentId}`),
+      axios.get(`http://localhost:8000/empty-repo-job/${emptyRepoJobId}`),
       axios.get(`http://localhost:8000/addressbook`),
       axios.get(`http://localhost:8000/products`),
       axios.get(`http://localhost:8000/inventory`),
       axios.get(`http://localhost:8000/movement-history`),
     ]);
 
-    const shipment = shipmentRes.data;
+    const emptyRepoJob = emptyRepoJobRes.data;
     const addressBooks = addressBooksRes.data;
     const products = productsRes.data;
     const inventory = inventoryRes.data;
@@ -108,46 +112,69 @@ export async function generateCroPdf(
       })
     );
 
-    // Get company information
-    const customer = addressBooks.find(
-      (ab: any) => ab.id === shipment.custAddressBookId
-    );
-    const consignee = addressBooks.find(
-      (ab: any) => ab.id === shipment.consigneeAddressBookId
-    );
+    // Get company information from empty repo job
     const shipper = addressBooks.find(
-      (ab: any) => ab.id === shipment.shipperAddressBookId
+      (ab: any) => ab.id === emptyRepoJob.shipperAddressBookId
     );
     const carrier = addressBooks.find(
-      (ab: any) => ab.id === shipment.carrierAddressBookId
+      (ab: any) => ab.id === emptyRepoJob.carrierAddressBookId
+    );
+    const emptyReturnDepot = addressBooks.find(
+      (ab: any) => ab.id === emptyRepoJob.emptyReturnDepotAddressBookId
+    );
+    const expHandlingAgent = addressBooks.find(
+      (ab: any) => ab.id === emptyRepoJob.expHandlingAgentAddressBookId
+    );
+    const impHandlingAgent = addressBooks.find(
+      (ab: any) => ab.id === emptyRepoJob.impHandlingAgentAddressBookId
     );
 
-    // Format dates - use provided date for CRO if available (for consistency), otherwise use shipment date
+    // Get the primary depot information - this should match what's shown in the CRO modal
+    const primaryDepot =
+      addressBooks.find(
+        (ab: any) =>
+          ab.companyName ===
+          (emptyRepoJob.containers?.[0]?.depotName || "Unknown Depot")
+      ) ||
+      addressBooks.find(
+        (ab: any) =>
+          ab.name ===
+          (emptyRepoJob.containers?.[0]?.depotName || "Unknown Depot")
+      ) ||
+      addressBooks.find((ab: any) => {
+        const depotName =
+          emptyRepoJob.containers?.[0]?.depotName || "Unknown Depot";
+        return (
+          ab.companyName?.includes(depotName) ||
+          depotName.includes(ab.companyName)
+        );
+      });
+
+    // Format dates - use provided date for CRO if available (for consistency), otherwise use empty repo job date
     const croDate = providedDate
       ? dayjs(providedDate).format("DD MMM YYYY")
-      : dayjs(shipment.date).format("DD MMM YYYY");
-    const releaseDate = dayjs(shipment.gsDate).format("DD-MM-YYYY");
+      : dayjs(emptyRepoJob.date).format("DD MMM YYYY");
+    const releaseDate = dayjs(emptyRepoJob.gsDate).format("DD-MM-YYYY");
     const etd =
-      shipment.gsDate && dayjs(shipment.gsDate).isValid()
-        ? dayjs(shipment.gsDate).format("DD-MM-YYYY")
+      emptyRepoJob.gsDate && dayjs(emptyRepoJob.gsDate).isValid()
+        ? dayjs(emptyRepoJob.gsDate).format("DD-MM-YYYY")
         : "";
     const eta =
-      shipment.etaTopod && dayjs(shipment.etaTopod).isValid()
-        ? dayjs(shipment.etaTopod).format("DD-MM-YYYY")
+      emptyRepoJob.etaTopod && dayjs(emptyRepoJob.etaTopod).isValid()
+        ? dayjs(emptyRepoJob.etaTopod).format("DD-MM-YYYY")
         : "";
 
     // Get port information
-    const pol = shipment.polPort?.portName || "N/A";
-    const pod = shipment.podPort?.portName || "N/A";
-    const finalDestination = shipment.podPort?.portName || "N/A";
+    const pol = emptyRepoJob.polPort?.portName || "N/A";
+    const pod = emptyRepoJob.podPort?.portName || "N/A";
+    const finalDestination = emptyRepoJob.podPort?.portName || "N/A";
 
     // Get vessel information
-    const vesselVoyage = shipment.vesselName || "N/A";
+    const vesselVoyage = emptyRepoJob.vesselName || "N/A";
 
-    // Get product information
-    const product = products.find((p: any) => p.id === shipment.productId);
-    const productName = product?.productName || "N/A";
-    const productType = product?.productType || "N/A";
+    // For empty repo jobs, we don't have specific products since they are for empty containers
+    const productName = "Empty Tank Container";
+    const productType = "Non-Hazardous";
 
     // Add containerSize to each container and get cargo history
     const containersWithSize = selectedContainers.map((sc) => {
@@ -193,11 +220,8 @@ export async function generateCroPdf(
             (id) => allShipmentsData[id] === null
           )
         );
-        console.log("Current shipment ID:", shipmentId);
-        console.log(
-          "Current shipment product:",
-          products.find((p: any) => p.id === shipment.productId)?.productName
-        );
+        console.log("Current empty repo job ID:", emptyRepoJobId);
+        console.log("Current empty repo job:", emptyRepoJob.jobNumber);
         console.log("===============================");
       }
 
@@ -259,7 +283,7 @@ export async function generateCroPdf(
       sortedMovements.forEach((movement: any, index: number) => {
         console.log(`\n--- Processing Movement ${index + 1} ---`);
         console.log(`Movement Shipment ID: ${movement.shipmentId}`);
-        console.log(`Current shipment ID: ${shipmentId}`);
+        console.log(`Current empty repo job ID: ${emptyRepoJobId}`);
 
         // Skip if no shipment ID or invalid movement
         if (!movement.shipmentId || !movement.date || !movement.id) {
@@ -269,18 +293,8 @@ export async function generateCroPdf(
 
         let productName: string | null = null;
 
-        // Method 1: If this is the current shipment
-        if (movement.shipmentId.toString() === shipmentId.toString()) {
-          const currentProduct = products.find(
-            (p: any) => p.id === shipment.productId
-          );
-          if (currentProduct?.productName) {
-            productName = currentProduct.productName;
-            console.log(`✓ Current shipment product: ${productName}`);
-          }
-        }
-        // Method 2: If this is a historical shipment that we successfully fetched
-        else if (
+        // For empty repo jobs, we only look at historical shipments to see what was previously carried
+        if (
           allShipmentsData[movement.shipmentId] &&
           allShipmentsData[movement.shipmentId] !== null
         ) {
@@ -295,7 +309,7 @@ export async function generateCroPdf(
             }
           }
         }
-        // Method 3: For deleted shipments - DO NOT ADD ANY PRODUCT
+        // For deleted shipments - DO NOT ADD ANY PRODUCT
         else {
           console.log(
             `⚠ Shipment ${movement.shipmentId} deleted or not found - skipping product`
@@ -320,18 +334,7 @@ export async function generateCroPdf(
         )}]`
       );
 
-      // ONLY add current shipment product if we have NO products yet
-      if (last3Products.length === 0) {
-        const currentProduct = products.find(
-          (p: any) => p.id === shipment.productId
-        );
-        if (currentProduct?.productName) {
-          last3Products.push(currentProduct.productName);
-          console.log(
-            `✓ Added current shipment product: ${currentProduct.productName}`
-          );
-        }
-      }
+      // For empty repo jobs, we don't add any current product since containers are empty
 
       // Fill remaining slots with "N/A" ONLY
       while (last3Products.length < 3) {
@@ -419,28 +422,28 @@ export async function generateCroPdf(
         doc.addPage();
       }
 
-      // More flexible depot lookup - try different matching strategies
-      let depot = addressBooks.find((ab: any) => ab.companyName === depotName);
+      // Use the primary depot information that was fetched earlier
+      // This ensures consistency with the CRO modal form data
+      let depot = primaryDepot;
 
-      // If not found by companyName, try by name field
+      // Fallback to lookup if primary depot is not available
       if (!depot) {
-        depot = addressBooks.find((ab: any) => ab.name === depotName);
+        depot =
+          addressBooks.find((ab: any) => ab.companyName === depotName) ||
+          addressBooks.find((ab: any) => ab.name === depotName) ||
+          addressBooks.find(
+            (ab: any) =>
+              ab.companyName?.includes(depotName) ||
+              depotName.includes(ab.companyName)
+          );
       }
 
-      // If still not found, try partial matching
-      if (!depot) {
-        depot = addressBooks.find(
-          (ab: any) =>
-            ab.companyName?.includes(depotName) ||
-            depotName.includes(ab.companyName)
-        );
-      }
-
-      console.log(`Depot lookup for ${depotName}:`, depot);
+      console.log(`Using depot for ${depotName}:`, depot);
 
       const depotAddress = depot?.address || "N/A";
       const depotContact = depot?.phone || "N/A";
       const depotEmail = depot?.email || "N/A";
+      const depotMobile = depot?.mobile || depot?.mobileNumber || ""; // For empty repo jobs, mobile should be empty if not provided
 
       const containerTypeSummary = groupContainerSizes(groupContainers);
       const containerCount = groupContainers.length;
@@ -478,13 +481,11 @@ export async function generateCroPdf(
               dayjs(movementShipment.etaTopod).isValid()
                 ? dayjs(movementShipment.etaTopod).format("DD-MM-YYYY")
                 : eta;
-
             groupEtd =
               movementShipment.gsDate &&
               dayjs(movementShipment.gsDate).isValid()
                 ? dayjs(movementShipment.gsDate).format("DD-MM-YYYY")
                 : etd;
-            etd;
           } else {
             groupEta = eta;
             groupEtd = etd;
@@ -583,35 +584,14 @@ export async function generateCroPdf(
       doc.setFontSize(10);
       doc.text(countryValue, 58, 91 + baseYOffset);
 
-      // Fix mobile field - check contacts array first, then direct fields (match CRO modal logic)
-      let mobileValue = "";
+      // For empty repo jobs, use the depotMobile variable that was set earlier
+      // This ensures consistency with the CRO modal form data
+      const mobileValue = depotMobile || "";
 
-      // First check if there are contacts and look for mobile in contacts
-      if (
-        depot?.contacts &&
-        Array.isArray(depot.contacts) &&
-        depot.contacts.length > 0
-      ) {
-        // Look for mobile number in the first contact
-        const firstContact = depot.contacts[0];
-        if (firstContact?.mobileNo) {
-          mobileValue = firstContact.mobileNo;
-        } else if (firstContact?.mobile) {
-          mobileValue = firstContact.mobile;
-        }
-        // Don't use phoneNumber from contacts as it might be landline
-      }
-
-      // If not found in contacts, check direct mobile fields only (avoid phone/contact fields)
-      if (!mobileValue) {
-        if (depot?.mobile) {
-          mobileValue = depot.mobile;
-        } else if (depot?.mobileNumber) {
-          mobileValue = depot.mobileNumber;
-        }
-      }
-
-      console.log("Mobile field debug - depot contacts:", depot?.contacts);
+      console.log(
+        "Mobile field debug - depotMobile from CRO form:",
+        depotMobile
+      );
       console.log("Mobile field debug - final mobileValue:", mobileValue);
 
       doc.setFont("arial", "bold");
@@ -635,36 +615,29 @@ export async function generateCroPdf(
       doc.setFontSize(10);
       doc.text(croDate, 165, 60);
 
-      doc.setFont("arial", "bold");
-      doc.setFontSize(10);
-      doc.text("HOUSE BL:", 120, 66);
-      doc.setFont("arial", "normal");
-      doc.setFontSize(10);
-      doc.text(shipment.houseBL || shipment.masterBL || "N/A", 165, 66);
+      // doc.setFont("arial", "bold");
+      // doc.setFontSize(10);
+      // doc.text("HOUSE BL:", 120, 66);
+      // doc.setFont("arial", "normal");
+      // doc.setFontSize(10);
+      // doc.text(shipment.houseBL || shipment.masterBL || "N/A", 165, 66);
 
-      doc.setFont("arial", "bold");
-      doc.setFontSize(10);
-      doc.text("REFERENCE NO.:", 120, 72);
-      doc.setFont("arial", "normal");
-      doc.setFontSize(10);
-      doc.text(shipment.refNumber || "", 165, 72);
+      // doc.setFont("arial", "bold");
+      // doc.setFontSize(10);
+      // doc.text("REFERENCE NO.:", 120, 72);
+      // doc.setFont("arial", "normal");
+      // doc.setFontSize(10);
+      // doc.text(shipment.refNumber || "", 165, 72);
 
       // --- SHIPMENT DETAILS ---
       const shipmentDetailsStartY = 110 + baseYOffset;
-      addTextWithSpacing(
-        doc,
-        "SHIPPER:",
-        shipper?.companyName || "N/A",
-        14,
-        shipmentDetailsStartY,
-        45
-      );
+      // addTextWithSpacing(doc, "SHIPPER:", shipper?.companyName || "N/A", 14, shipmentDetailsStartY, 45);
       addTextWithSpacing(
         doc,
         "RELEASE DATE:",
         releaseDate,
         14,
-        shipmentDetailsStartY + 6,
+        shipmentDetailsStartY,
         45
       );
       addTextWithSpacing(
@@ -672,7 +645,7 @@ export async function generateCroPdf(
         "POL:",
         groupPol,
         14,
-        shipmentDetailsStartY + 12,
+        shipmentDetailsStartY + 6,
         45
       );
       addTextWithSpacing(
@@ -680,29 +653,13 @@ export async function generateCroPdf(
         "FINAL DESTINATION:",
         finalDestination,
         14,
-        shipmentDetailsStartY + 18,
+        shipmentDetailsStartY + 12,
         45
       );
-      addTextWithSpacing(
-        doc,
-        "TANK PREP:",
-        shipment.tankPreparation || "N/A",
-        14,
-        shipmentDetailsStartY + 24,
-        45
-      );
+      // addTextWithSpacing(doc, "TANK PREP:", shipment.tankPreparation || "N/A", 14, shipmentDetailsStartY + 24, 45);
 
-      // Add hazardous status below TANK PREP value
-      const hazardousStatus =
-        productType === "Hazardous" ? "Hazardous" : "Non-Hazardous";
-      addTextWithSpacing(
-        doc,
-        "PRODUCT TYPE:",
-        hazardousStatus,
-        14,
-        shipmentDetailsStartY + 30,
-        45
-      );
+      // // For empty repo jobs, containers are always non-hazardous since they're empty
+      // addTextWithSpacing(doc, "PRODUCT TYPE:", "Non-Hazardous", 14, shipmentDetailsStartY + 18, 45);
 
       // --- RIGHT COLUMN SHIPMENT DETAILS ---
       addTextWithSpacing(
@@ -714,20 +671,13 @@ export async function generateCroPdf(
         50
       );
       // Add product name below POD value
-      addTextWithSpacing(
-        doc,
-        "PRODUCT NAME:",
-        productName,
-        120,
-        shipmentDetailsStartY + 6,
-        50
-      );
+      // addTextWithSpacing(doc, "PRODUCT NAME:", productName, 120, shipmentDetailsStartY + 6, 50);
       addTextWithSpacing(
         doc,
         "POD:",
         groupPod,
         120,
-        shipmentDetailsStartY + 12,
+        shipmentDetailsStartY + 6,
         50
       );
 
@@ -1019,7 +969,7 @@ export async function generateCroPdf(
 
     doc.save(
       `${
-        shipment.houseBL || shipment.masterBL || shipment.jobNumber || "CRO"
+        emptyRepoJob.houseBL || emptyRepoJob.jobNumber || "EmptyRepo_CRO"
       }_CRO.pdf`
     );
   } catch (err) {

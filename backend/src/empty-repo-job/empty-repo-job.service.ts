@@ -8,28 +8,22 @@ export class EmptyRepoJobService {
   constructor(private readonly prisma: PrismaService) {}
 
   private async generateJobNumber(polCode: string, podCode: string): Promise<string> {
+    // GLOBAL sequence across all EmptyRepoJobs irrespective of ports
     const year = new Date().getFullYear().toString().slice(-2);
     const prefix = `RST/${polCode}${podCode}/${year}/`;
 
-    const latestJob = await this.prisma.emptyRepoJob.findFirst({
-      where: {
-        jobNumber: { startsWith: `${prefix}ER` },
-      },
-      orderBy: { jobNumber: 'desc' },
-    });
-
-    let nextSeq = 1;
-    if (latestJob?.jobNumber) {
-      const parts = latestJob.jobNumber.split('/');
-      if (parts.length >= 4) {
-        const seqPart = parts[3].replace('ER', '');
-        const lastSeq = parseInt(seqPart, 10);
-        if (!isNaN(lastSeq)) {
-          nextSeq = lastSeq + 1;
-        }
+    // Fetch all job numbers and compute the global max ER sequence
+    const allJobs = await this.prisma.emptyRepoJob.findMany({ select: { jobNumber: true } });
+    let maxSeq = 0;
+    for (const j of allJobs) {
+      const match = j.jobNumber?.match(/ER(\d{5})$/);
+      if (match) {
+        const n = parseInt(match[1], 10);
+        if (!isNaN(n)) maxSeq = Math.max(maxSeq, n);
       }
     }
 
+    const nextSeq = maxSeq + 1;
     const paddedSeq = String(nextSeq).padStart(5, '0');
     return `${prefix}ER${paddedSeq}`;
   }
@@ -96,8 +90,8 @@ export class EmptyRepoJobService {
     const jobNumber = await this.generateJobNumber(polPort.portCode, podPort.portCode);
     const houseBL = jobNumber;
 
-    const parseDate = (d: string | Date | undefined) =>
-      d ? new Date(d).toISOString() : new Date().toISOString();
+    const parseDateOrNull = (d: string | Date | undefined) =>
+      d ? new Date(d).toISOString() : null;
 
     return this.prisma.$transaction(async (tx) => {
       const jobDataForCreate: any = {
@@ -106,10 +100,10 @@ export class EmptyRepoJobService {
         houseBL,
         polPortId,
         podPortId,
-        date: parseDate(jobData.date),
-        gsDate: parseDate(jobData.gsDate),
-        etaTopod: parseDate(jobData.etaTopod),
-        estimateDate: parseDate(jobData.estimateDate),
+        date: jobData.date ? new Date(jobData.date).toISOString() : new Date().toISOString(),
+        gsDate: parseDateOrNull(jobData.gsDate),
+        etaTopod: parseDateOrNull(jobData.etaTopod),
+        estimateDate: parseDateOrNull(jobData.estimateDate),
       };
 
       if (jobData.sob) {
@@ -182,13 +176,14 @@ export class EmptyRepoJobService {
 
       if (!polPort || !podPort) throw new Error('Invalid port IDs');
 
-      let jobNumber = existingJob.jobNumber;
+      // Preserve existing ER sequence suffix globally, only change the prefix if ports changed
       const year = new Date().getFullYear().toString().slice(-2);
       const newPrefix = `RST/${polPort.portCode}${podPort.portCode}/${year}/`;
-
-      if (!jobNumber.startsWith(newPrefix)) {
-        jobNumber = await this.generateJobNumber(polPort.portCode, podPort.portCode);
-      }
+      const seqMatch = existingJob.jobNumber.match(/(ER\d{5})$/);
+      const seqSuffix = seqMatch ? seqMatch[1] : undefined;
+      const jobNumber = existingJob.jobNumber.startsWith(newPrefix) || !seqSuffix
+        ? existingJob.jobNumber
+        : `${newPrefix}${seqSuffix}`;
 
       const updatedJob = await tx.emptyRepoJob.update({
         where: { id },
@@ -308,5 +303,44 @@ export class EmptyRepoJobService {
         where: { id },
       });
     });
+  }
+
+  async markCroGenerated(id: number) {
+    try {
+      // Get the existing empty repo job
+      const existingJob = await this.prisma.emptyRepoJob.findUnique({
+        where: { id },
+      });
+
+      if (!existingJob) {
+        throw new Error('Empty repo job not found');
+      }
+
+      const currentDate = new Date();
+      const updateData: any = {};
+
+      // Set hasCroGenerated to true if not already set
+      if (!existingJob.hasCroGenerated) {
+        updateData.hasCroGenerated = true;
+      }
+
+      // Set firstCroGenerationDate if not already set
+      if (!existingJob.firstCroGenerationDate) {
+        updateData.firstCroGenerationDate = currentDate;
+      }
+
+      // Only update if there's something to update
+      if (Object.keys(updateData).length > 0) {
+        return await this.prisma.emptyRepoJob.update({
+          where: { id },
+          data: updateData,
+        });
+      }
+
+      return existingJob;
+    } catch (error) {
+      console.error('❌ Failed to mark empty repo CRO as generated:', error);
+      throw new Error('Empty repo CRO generation tracking failed. See logs for details.');
+    }
   }
 }
