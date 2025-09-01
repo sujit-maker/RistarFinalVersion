@@ -8,6 +8,7 @@ import {
   Delete,
   ParseIntPipe,
   UseGuards,
+  Put,
 } from '@nestjs/common';
 import { ShipmentService } from './shipment.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
@@ -40,7 +41,7 @@ export class ShipmentController {
     return this.shipmentService.findOne(+id);
   }
 
-  @UseGuards(AuthGuard('jwt'))           // 👈 add at controller level (or per method)
+  @UseGuards(AuthGuard('jwt'))          
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateShipmentDto: UpdateShipmentDto) {
     return this.shipmentService.update(+id, updateShipmentDto);
@@ -61,5 +62,25 @@ export class ShipmentController {
   @Post('mark-cro-generated/:id')
   markCroGenerated(@Param('id', ParseIntPipe) id: number) {
     return this.shipmentService.markCroGenerated(id);
+  }
+
+ // --- assignments endpoints (optionally guarded) ---
+  @UseGuards(AuthGuard('jwt')) // optional for GET, recommended for PUT
+  @Get('assignments/:shipmentId/:blType')
+  async getAssignments(
+    @Param('shipmentId', ParseIntPipe) shipmentId: number,
+    @Param('blType') blType: 'draft' | 'original' | 'seaway',
+  ) {
+    return this.shipmentService.getBlAssignments(shipmentId, blType);
+  }
+
+  @UseGuards(AuthGuard('jwt'))
+  @Put('assignments/:shipmentId/:blType')
+  async putAssignments(
+    @Param('shipmentId', ParseIntPipe) shipmentId: number,
+    @Param('blType') blType: 'draft' | 'original' | 'seaway',
+    @Body() body: { groups: string[][] },
+  ) {
+    return this.shipmentService.saveBlAssignments(shipmentId, blType, body.groups || []);
   }
 }

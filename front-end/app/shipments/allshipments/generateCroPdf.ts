@@ -123,18 +123,23 @@ export async function generateCroPdf(
     );
 
     // Format dates - use provided date for CRO if available (for consistency), otherwise use shipment date
-    const croDate = providedDate
-      ? dayjs(providedDate).format("DD MMM YYYY")
-      : dayjs(shipment.date).format("DD MMM YYYY");
-    const releaseDate = dayjs(shipment.gsDate).format("DD-MM-YYYY");
-    const etd =
-      shipment.gsDate && dayjs(shipment.gsDate).isValid()
-        ? dayjs(shipment.gsDate).format("DD-MM-YYYY")
-        : "";
-    const eta =
-      shipment.etaTopod && dayjs(shipment.etaTopod).isValid()
-        ? dayjs(shipment.etaTopod).format("DD-MM-YYYY")
-        : "";
+    const croDate = providedDate ? dayjs(providedDate).format("DD MMM YYYY") : dayjs(shipment.date).format("DD MMM YYYY");
+   const releaseDate =
+  shipment.gsDate && dayjs(shipment.gsDate).isValid()
+    ? dayjs(shipment.gsDate).format("DD-MM-YYYY")
+    : "date not set yet";
+
+// Safe ETD / ETA
+const etd =
+  shipment.gsDate && dayjs(shipment.gsDate).isValid()
+    ? dayjs(shipment.gsDate).format("DD-MM-YYYY")
+    : "(date not set yet)";
+
+const eta =
+  shipment.etaTopod && dayjs(shipment.etaTopod).isValid()
+    ? dayjs(shipment.etaTopod).format("DD-MM-YYYY")
+    : "(date not set yet)";
+
 
     // Get port information
     const pol = shipment.polPort?.portName || "N/A";
@@ -467,24 +472,18 @@ export async function generateCroPdf(
 
         if (containerMovements.length > 0) {
           const latestMovement = containerMovements[0];
-          if (
-            latestMovement.shipmentId &&
-            allShipmentsData[latestMovement.shipmentId]
-          ) {
-            const movementShipment =
-              allShipmentsData[latestMovement.shipmentId];
-            groupEta =
-              movementShipment.etaTopod &&
-              dayjs(movementShipment.etaTopod).isValid()
-                ? dayjs(movementShipment.etaTopod).format("DD-MM-YYYY")
-                : eta;
 
-            groupEtd =
-              movementShipment.gsDate &&
-              dayjs(movementShipment.gsDate).isValid()
-                ? dayjs(movementShipment.gsDate).format("DD-MM-YYYY")
-                : etd;
-            etd;
+          if (latestMovement.shipmentId && allShipmentsData[latestMovement.shipmentId]) {
+            const movementShipment = allShipmentsData[latestMovement.shipmentId];
+groupEta =
+  movementShipment.etaTopod && dayjs(movementShipment.etaTopod).isValid()
+    ? dayjs(movementShipment.etaTopod).format("DD-MM-YYYY")
+    : eta;
+
+groupEtd =
+  movementShipment.gsDate && dayjs(movementShipment.gsDate).isValid()
+    ? dayjs(movementShipment.gsDate).format("DD-MM-YYYY")
+    : etd;etd;
           } else {
             groupEta = eta;
             groupEtd = etd;

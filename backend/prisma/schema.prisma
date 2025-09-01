@@ -455,6 +455,7 @@ model Shipment {
   shipperAddressBook            AddressBook?        @relation("ShipmentShipper", fields: [shipperAddressBookId], references: [id])
   transhipmentPort              Ports?              @relation("ShipmentTranshipment", fields: [transhipmentPortId], references: [id])
   containers                    ShipmentContainer[]
+  blAssignment                  BlAssignment[]
 }
 
 model ShipmentContainer {
@@ -468,6 +469,22 @@ model ShipmentContainer {
   depotName       String?
   shipment        Shipment @relation(fields: [shipmentId], references: [id])
 }
+
+model BlAssignment {
+  id               Int       @id @default(autoincrement())
+  shipmentId       Int
+  blType           String    // 'draft' | 'original' | 'seaway'
+  blIndex          Int       // 0-based index of the split (0=1st BL, 1=2nd BL, ...)
+  containerNumbers Json      // e.g. ["ABC123","DEF456"]
+
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  shipment         Shipment  @relation(fields: [shipmentId], references: [id])
+
+  @@unique([shipmentId, blType, blIndex])
+}
+
 
 model EmptyRepoJob {
   id                            Int                     @id @default(autoincrement())

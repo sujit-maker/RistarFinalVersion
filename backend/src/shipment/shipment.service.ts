@@ -8,12 +8,22 @@ export class ShipmentService {
   constructor(private readonly prisma: PrismaService) {}
 
 async create(data: CreateShipmentDto) {
-  const currentYear = new Date().getFullYear().toString().slice(-2); // "25"
+  if (!data.polPortId || !data.podPortId) {
+    throw new Error('POL and POD port IDs are required');
+  }
 
-  // ✅ Fetch polPort & podPort to extract portCode
+  const currentYear = new Date().getFullYear().toString().slice(-2); // e.g. "25"
+
+  // ✅ Fetch port codes
   const [polPort, podPort] = await Promise.all([
-    this.prisma.ports.findUnique({ where: { id: data.polPortId }, select: { portCode: true } }),
-    this.prisma.ports.findUnique({ where: { id: data.podPortId }, select: { portCode: true } }),
+    this.prisma.ports.findUnique({
+      where: { id: data.polPortId },
+      select: { portCode: true },
+    }),
+    this.prisma.ports.findUnique({
+      where: { id: data.podPortId },
+      select: { portCode: true },
+    }),
   ]);
 
   const polCode = polPort?.portCode || 'XXX';
@@ -21,15 +31,12 @@ async create(data: CreateShipmentDto) {
 
   const prefix = `RST/${polCode}${podCode}/${currentYear}/`;
 
+  // ✅ Find latest shipment for sequence
   const latestShipment = await this.prisma.shipment.findFirst({
     where: {
-      houseBL: {
-        startsWith: prefix,
-      },
+      houseBL: { startsWith: prefix },
     },
-    orderBy: {
-      houseBL: 'desc',
-    },
+    orderBy: { houseBL: 'desc' },
   });
 
   let nextSequence = 1;
@@ -44,60 +51,119 @@ async create(data: CreateShipmentDto) {
   const paddedSequence = String(nextSequence).padStart(5, '0');
   const generatedHouseBL = `${prefix}${paddedSequence}`;
 
-  const { containers, ...otherData } = data;
+  const { containers, ...rest } = data;
 
-  const parseDateOrUndefined = (d: string | Date | undefined) =>
-    d ? new Date(d).toISOString() : undefined;
 
-  // Generate jobNumber before transaction
+  // ✅ Parse dates
+  const parseDate = (d: string | Date | null | undefined) =>
+    d && d !== '' ? new Date(d) : null;
+
+  // ✅ Generate jobNumber before transaction
   const generatedJobNumber = await this.getNextJobNumber();
 
   return this.prisma.$transaction(async (tx) => {
-    // Build the data object conditionally
+    // Build base shipment data
     const shipmentData: any = {
-      ...otherData, // This spreads all the other fields
-      houseBL: generatedHouseBL,
+      quotationRefNumber: rest.quotationRefNumber ?? null,
+      date: parseDate(rest.date),
       jobNumber: generatedJobNumber,
-      // 'date' is required; if not provided, fallback to now, but optional fields remain empty
-      date: data.date ? new Date(data.date).toISOString() : new Date().toISOString(),
-      gsDate: data.gsDate ? new Date(data.gsDate).toISOString() : null,
-      etaTopod: data.etaTopod ? new Date(data.etaTopod).toISOString() : null,
-      estimateDate: data.estimateDate ? new Date(data.estimateDate).toISOString() : null,
+
+      refNumber: rest.refNumber ?? '',
+      masterBL: rest.masterBL ?? '',
+      houseBL: generatedHouseBL,
+      shippingTerm: rest.shippingTerm ?? '',
+      polFreeDays: rest.polFreeDays ?? '0',
+      podFreeDays: rest.podFreeDays ?? '0',
+      polDetentionRate: rest.polDetentionRate ?? '0',
+      podDetentionRate: rest.podDetentionRate ?? '0',
+      quantity: rest.quantity ?? '0',
+      vesselName: rest.vesselName ?? '',
+      gsDate: parseDate(rest.gsDate),
+      etaTopod: parseDate(rest.etaTopod),
+      estimateDate: parseDate(rest.estimateDate),
+      sob: parseDate(rest.sob),
     };
 
-    // Handle SOB date conditionally - only set if provided
-    if (data.sob) {
-      shipmentData.sob = new Date(data.sob).toISOString();
-    } else {
-      shipmentData.sob = null;
+    // ✅ Map FK IDs into Prisma relations
+    if (rest.custAddressBookId) {
+      shipmentData.customerAddressBook = {
+        connect: { id: rest.custAddressBookId },
+      };
+    }
+    if (rest.consigneeAddressBookId) {
+      shipmentData.consigneeAddressBook = {
+        connect: { id: rest.consigneeAddressBookId },
+      };
+    }
+    if (rest.shipperAddressBookId) {
+      shipmentData.shipperAddressBook = {
+        connect: { id: rest.shipperAddressBookId },
+      };
+    }
+    if (rest.expHandlingAgentAddressBookId) {
+      shipmentData.expHandlingAgentAddressBook = {
+        connect: { id: rest.expHandlingAgentAddressBookId },
+      };
+    }
+    if (rest.impHandlingAgentAddressBookId) {
+      shipmentData.impHandlingAgentAddressBook = {
+        connect: { id: rest.impHandlingAgentAddressBookId },
+      };
+    }
+    if (rest.emptyReturnDepotAddressBookId) {
+      shipmentData.emptyReturnDepotAddressBook = {
+        connect: { id: rest.emptyReturnDepotAddressBookId },
+      };
+    }
+    if (rest.carrierAddressBookId) {
+      shipmentData.carrierAddressBook = {
+        connect: { id: rest.carrierAddressBookId },
+      };
+    }
+    if (rest.productId) {
+      shipmentData.product = {
+        connect: { id: rest.productId },
+      };
+    }
+    if (rest.polPortId) {
+      shipmentData.polPort = {
+        connect: { id: rest.polPortId },
+      };
+    }
+    if (rest.podPortId) {
+      shipmentData.podPort = {
+        connect: { id: rest.podPortId },
+      };
+    }
+    if (rest.transhipmentPortId) {
+      shipmentData.transhipmentPort = {
+        connect: { id: rest.transhipmentPortId },
+      };
     }
 
-    // Only include quotationRefNumber if it's provided
-    if (data.quotationRefNumber) {
-      shipmentData.quotationRefNumber = data.quotationRefNumber;
-    }
-
-    // Remove containers from shipmentData as it's handled separately
-    delete shipmentData.containers;
-
+    // ✅ Create shipment
     const createdShipment = await tx.shipment.create({
       data: shipmentData,
     });
 
-    if (containers && containers.length > 0) {
+    // ✅ Handle containers if provided
+    if (containers?.length) {
       await tx.shipmentContainer.createMany({
         data: containers.map((c) => ({
           containerNumber: c.containerNumber,
           capacity: c.capacity,
           tare: c.tare,
-          portId: c.portId,
-          depotName: c.depotName,
-          inventoryId: c.inventoryId,
+          portId: c.portId ?? undefined,
+          depotName: c.depotName ?? undefined,
+          inventoryId: c.inventoryId ?? undefined,
           shipmentId: createdShipment.id,
         })),
       });
 
+      // ✅ Update inventory + movement history
       for (const container of containers) {
+        if (!container.containerNumber) continue;
+
         const inventory = await tx.inventory.findFirst({
           where: { containerNumber: container.containerNumber },
         });
@@ -109,18 +175,17 @@ async create(data: CreateShipmentDto) {
           });
 
           if (leasingInfo) {
-         await tx.movementHistory.create({
-  data: {
-    inventoryId: inventory.id,
-    portId: leasingInfo.portId,
-    addressBookId: leasingInfo.onHireDepotaddressbookId,
-    shipmentId: createdShipment.id,
-    status: 'ALLOTTED',
-    date: new Date(),
-    jobNumber: createdShipment.jobNumber, // ✅ ADD THIS LINE ONLY HERE
-  },
-});
-
+            await tx.movementHistory.create({
+              data: {
+                inventoryId: inventory.id,
+                portId: leasingInfo.portId,
+                addressBookId: leasingInfo.onHireDepotaddressbookId,
+                shipmentId: createdShipment.id,
+                status: 'ALLOTTED',
+                date: new Date(),
+                jobNumber: createdShipment.jobNumber,
+              },
+            });
           }
         }
       }
@@ -130,10 +195,7 @@ async create(data: CreateShipmentDto) {
   });
 }
 
-
-
-
- async getNextJobNumber(): Promise<string> {
+  async getNextJobNumber(): Promise<string> {
     const currentYear = new Date().getFullYear().toString().slice(-2); // "25"
     const prefix = `${currentYear}/`;
 
@@ -162,24 +224,23 @@ async create(data: CreateShipmentDto) {
   }
 
   findAll() {
-  return this.prisma.shipment.findMany({
-    include: {
-      customerAddressBook: true,
-      consigneeAddressBook: true,
-      shipperAddressBook: true,
-      polPort: true,
-      podPort: true,
-      product: true,
-      transhipmentPort: true,
-      expHandlingAgentAddressBook: true,
-      impHandlingAgentAddressBook: true,
-      carrierAddressBook: true,
-      emptyReturnDepotAddressBook: true,
-      containers: true, // ✅ Add this line
-    },
-  });
-}
-
+    return this.prisma.shipment.findMany({
+      include: {
+        customerAddressBook: true,
+        consigneeAddressBook: true,
+        shipperAddressBook: true,
+        polPort: true,
+        podPort: true,
+        product: true,
+        transhipmentPort: true,
+        expHandlingAgentAddressBook: true,
+        impHandlingAgentAddressBook: true,
+        carrierAddressBook: true,
+        emptyReturnDepotAddressBook: true,
+        containers: true,
+      },
+    });
+  }
 
   findOne(id: number) {
     return this.prisma.shipment.findUnique({
@@ -201,180 +262,226 @@ async create(data: CreateShipmentDto) {
     });
   }
 
- async update(id: number, data: UpdateShipmentDto) {
-  const { containers, ...shipmentData } = data;
+  async update(id: number, data: UpdateShipmentDto) {
+    const { containers, ...shipmentData } = data;
 
-  // Fetch the current shipment to get the jobNumber
-  const currentShipment = await this.prisma.shipment.findUnique({
-    where: { id },
-    select: { jobNumber: true },
-  });
-  const jobNumber = currentShipment?.jobNumber || 'UNKNOWN';
-
-  return this.prisma.$transaction(async (tx) => {
-    // 1. Fetch existing containers for this shipment
-    const existingContainers = await tx.shipmentContainer.findMany({
-      where: { shipmentId: id },
-    });
-
-    const existingInventoryIds = existingContainers
-      .map((c) => c.inventoryId)
-      .filter((id): id is number => id !== null && id !== undefined);
-
-    const newInventoryIds = (containers || [])
-      .map((c) => c.inventoryId)
-      .filter((id): id is number => id !== null && id !== undefined);
-
-    // 2. Identify removed inventoryIds (no longer in the new list)
-    const removedInventoryIds = existingInventoryIds.filter(
-      (oldId) => !newInventoryIds.includes(oldId),
-    );
-
-    // 3. Handle removed containers
-    for (const inventoryId of removedInventoryIds) {
-      const leasingInfo = await tx.leasingInfo.findFirst({
-        where: { inventoryId },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (!leasingInfo || leasingInfo.portId == null || leasingInfo.onHireDepotaddressbookId == null) {
-        throw new Error(`Leasing info incomplete for inventoryId ${inventoryId}`);
-      }
-
-      // 3a. Mark as AVAILABLE and clear shipmentId and emptyRepoJobId
-      await tx.movementHistory.create({
-        data: {
-          inventoryId,
-          portId: leasingInfo.portId,
-          addressBookId: leasingInfo.onHireDepotaddressbookId,
-          status: 'AVAILABLE',
-          date: new Date(),
-          remarks: `Removed from shipment - ${jobNumber}`,
-          shipmentId: null,
-          emptyRepoJobId: null,
-        },
-      });
-    }
-
-    // 4. Update shipment main data
-    const updatedShipment = await tx.shipment.update({
+    // Fetch the current shipment to get the jobNumber
+    const currentShipment = await this.prisma.shipment.findUnique({
       where: { id },
-      data: {
-        ...shipmentData,
-        date: shipmentData.date ? new Date(shipmentData.date) : undefined,
-        gsDate: shipmentData.gsDate ? new Date(shipmentData.gsDate) : undefined,
-        etaTopod: shipmentData.etaTopod ? new Date(shipmentData.etaTopod) : undefined,
-        estimateDate: shipmentData.estimateDate ? new Date(shipmentData.estimateDate) : undefined,
-        sob: shipmentData.sob ? new Date(shipmentData.sob) : null,
-      },
+      select: { jobNumber: true },
     });
+    const jobNumber = currentShipment?.jobNumber || 'UNKNOWN';
 
-    // 5. Delete old containers
-    await tx.shipmentContainer.deleteMany({
-      where: { shipmentId: id },
-    });
-
-    // 6. Re-create container records
-    if (containers && containers.length > 0) {
-      await tx.shipmentContainer.createMany({
-        data: containers.map((container) => ({
-          containerNumber: container.containerNumber,
-          capacity: container.capacity,
-          tare: container.tare,
-          portId: container.portId ?? undefined,
-          depotName: container.depotName ?? undefined,
-          inventoryId: container.inventoryId ?? undefined,
-          shipmentId: id,
-        })),
+    return this.prisma.$transaction(async (tx) => {
+      // 1. Fetch existing containers for this shipment
+      const existingContainers = await tx.shipmentContainer.findMany({
+        where: { shipmentId: id },
       });
 
-      // 7. Log movement history for new containers
-      for (const container of containers) {
-        if (!container.inventoryId) continue;
+      const existingInventoryIds = existingContainers
+        .map((c) => c.inventoryId)
+        .filter((id): id is number => id !== null && id !== undefined);
 
+      const newInventoryIds = (containers || [])
+        .map((c) => c.inventoryId)
+        .filter((id): id is number => id !== null && id !== undefined);
+
+      // 2. Identify removed inventoryIds (no longer in the new list)
+      const removedInventoryIds = existingInventoryIds.filter(
+        (oldId) => !newInventoryIds.includes(oldId),
+      );
+
+      // 3. Handle removed containers
+      for (const inventoryId of removedInventoryIds) {
         const leasingInfo = await tx.leasingInfo.findFirst({
-          where: { inventoryId: container.inventoryId },
+          where: { inventoryId },
           orderBy: { createdAt: 'desc' },
         });
 
-        if (!leasingInfo || leasingInfo.portId == null || leasingInfo.onHireDepotaddressbookId == null) {
-          throw new Error(`Leasing info incomplete for inventoryId ${container.inventoryId}`);
+        if (
+          !leasingInfo ||
+          leasingInfo.portId == null ||
+          leasingInfo.onHireDepotaddressbookId == null
+        ) {
+          throw new Error(`Leasing info incomplete for inventoryId ${inventoryId}`);
         }
 
         await tx.movementHistory.create({
           data: {
-            inventoryId: container.inventoryId,
+            inventoryId,
             portId: leasingInfo.portId,
             addressBookId: leasingInfo.onHireDepotaddressbookId,
-            status: 'ALLOTTED',
+            status: 'AVAILABLE',
             date: new Date(),
-            shipmentId: id,
+            remarks: `Removed from shipment - ${jobNumber}`,
+            shipmentId: null,
             emptyRepoJobId: null,
           },
         });
       }
-    }
 
-    return updatedShipment;
-  });
-}
-
-
-async remove(id: number) {
-  const shipment = await this.prisma.shipment.findUniqueOrThrow({
-    where: { id },
-    select: {
-      id: true,
-      jobNumber: true,
-    },
-  });
-
-  const containers = await this.prisma.shipmentContainer.findMany({
-    where: { shipmentId: id },
-  });
-
-  return this.prisma.$transaction(async (tx) => {
-    for (const container of containers) {
-      const inventoryId = container.inventoryId;
-
-      if (!inventoryId) continue; // Skip if null
-
-      const leasingInfo = await tx.leasingInfo.findFirst({
-        where: {
-          inventoryId: inventoryId, // Ensure it's not null
+      // 4. Update shipment main data
+      const updatedShipment = await tx.shipment.update({
+        where: { id },
+        data: {
+          ...shipmentData,
+          date: shipmentData.date ? new Date(shipmentData.date) : undefined,
+          gsDate: shipmentData.gsDate ? new Date(shipmentData.gsDate) : undefined,
+          etaTopod: shipmentData.etaTopod ? new Date(shipmentData.etaTopod) : undefined,
+          estimateDate: shipmentData.estimateDate
+            ? new Date(shipmentData.estimateDate)
+            : undefined,
+          sob: shipmentData.sob ? new Date(shipmentData.sob) : null,
         },
-        orderBy: { createdAt: 'desc' },
       });
 
-      if (!leasingInfo || !leasingInfo.portId || !leasingInfo.onHireDepotaddressbookId) {
-        throw new Error(`Leasing info missing for inventoryId ${inventoryId}`);
+      // 5. Delete old containers
+      await tx.shipmentContainer.deleteMany({
+        where: { shipmentId: id },
+      });
+
+      // 6. Re-create container records
+      if (containers && containers.length > 0) {
+        await tx.shipmentContainer.createMany({
+          data: containers.map((container) => ({
+            containerNumber: container.containerNumber,
+            capacity: container.capacity,
+            tare: container.tare,
+            portId: container.portId ?? undefined,
+            depotName: container.depotName ?? undefined,
+            inventoryId: container.inventoryId ?? undefined,
+            shipmentId: id,
+          })),
+        });
+
+        // 7. Log movement history for new containers
+        for (const container of containers) {
+          if (!container.inventoryId) continue;
+
+          const leasingInfo = await tx.leasingInfo.findFirst({
+            where: { inventoryId: container.inventoryId },
+            orderBy: { createdAt: 'desc' },
+          });
+
+          if (
+            !leasingInfo ||
+            leasingInfo.portId == null ||
+            leasingInfo.onHireDepotaddressbookId == null
+          ) {
+            throw new Error(`Leasing info incomplete for inventoryId ${container.inventoryId}`);
+          }
+
+          await tx.movementHistory.create({
+            data: {
+              inventoryId: container.inventoryId,
+              portId: leasingInfo.portId,
+              addressBookId: leasingInfo.onHireDepotaddressbookId,
+              status: 'ALLOTTED',
+              date: new Date(),
+              shipmentId: id,
+              emptyRepoJobId: null,
+            },
+          });
+        }
       }
 
-      await tx.movementHistory.create({
-        data: {
-          inventoryId,
-          portId: leasingInfo.portId,
-          addressBookId: leasingInfo.onHireDepotaddressbookId,
-          status: 'AVAILABLE',
-          date: new Date(),
-          remarks: `Shipment cancelled - ${shipment.jobNumber}`,
-          shipmentId: shipment.id,
-          emptyRepoJobId: null,
-        },
-      });
-    }
+      return updatedShipment;
+    });
+  }
 
-    await tx.shipmentContainer.deleteMany({
+  async getBlAssignments(shipmentId: number, blType: 'draft'|'original'|'seaway') {
+    const rows = await this.prisma.blAssignment.findMany({
+      where: { shipmentId, blType },
+      orderBy: { blIndex: 'asc' },
+      select: { blIndex: true, containerNumbers: true },
+    });
+
+    // build groups as string[][]
+    const groups: string[][] = rows.map(r => (r.containerNumbers as string[]));
+    return { shipmentId, blType, groups };
+  }
+
+  async saveBlAssignments(
+    shipmentId: number,
+    blType: 'draft'|'original'|'seaway',
+    groups: string[][],
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      // clear existing for this shipment + type
+      await tx.blAssignment.deleteMany({
+        where: { shipmentId, blType },
+      });
+
+      if (!groups?.length) return { shipmentId, blType, groups: [] };
+
+      // create one row per BL index
+      await tx.blAssignment.createMany({
+        data: groups.map((g, idx) => ({
+          shipmentId,
+          blType,
+          blIndex: idx,
+          containerNumbers: g,
+        })),
+      });
+
+      return { shipmentId, blType, groups };
+    });
+  }
+
+  async remove(id: number) {
+    const shipment = await this.prisma.shipment.findUniqueOrThrow({
+      where: { id },
+      select: {
+        id: true,
+        jobNumber: true,
+      },
+    });
+
+    const containers = await this.prisma.shipmentContainer.findMany({
       where: { shipmentId: id },
     });
 
-    return tx.shipment.delete({
-      where: { id },
+    return this.prisma.$transaction(async (tx) => {
+      for (const container of containers) {
+        const inventoryId = container.inventoryId;
+        if (!inventoryId) continue;
+
+        const leasingInfo = await tx.leasingInfo.findFirst({
+          where: { inventoryId },
+          orderBy: { createdAt: 'desc' },
+        });
+
+        if (!leasingInfo || !leasingInfo.portId || !leasingInfo.onHireDepotaddressbookId) {
+          throw new Error(`Leasing info missing for inventoryId ${inventoryId}`);
+        }
+
+        await tx.movementHistory.create({
+          data: {
+            inventoryId,
+            portId: leasingInfo.portId,
+            addressBookId: leasingInfo.onHireDepotaddressbookId,
+            status: 'AVAILABLE',
+            date: new Date(),
+            remarks: `Shipment cancelled - ${shipment.jobNumber}`,
+            shipmentId: shipment.id,
+            emptyRepoJobId: null,
+          },
+        });
+      }
+
+      await tx.shipmentContainer.deleteMany({
+        where: { shipmentId: id },
+      });
+
+    await tx.blAssignment.deleteMany({
+      where: { shipmentId: id },
     });
-  });
-}
 
-
+      return tx.shipment.delete({
+        where: { id },
+      });
+    });
+  }
 
   async getQuotationDataByRef(refNumber: string) {
     return this.prisma.quotation.findUnique({
@@ -390,7 +497,6 @@ async remove(id: number) {
 
   async markCroGenerated(id: number) {
     try {
-      // Get the existing shipment
       const existingShipment = await this.prisma.shipment.findUnique({
         where: { id },
       });
@@ -402,17 +508,14 @@ async remove(id: number) {
       const currentDate = new Date();
       const updateData: any = {};
 
-      // Set hasCroGenerated to true if not already set
       if (!existingShipment.hasCroGenerated) {
         updateData.hasCroGenerated = true;
       }
 
-      // Set firstCroGenerationDate if not already set
       if (!existingShipment.firstCroGenerationDate) {
         updateData.firstCroGenerationDate = currentDate;
       }
 
-      // Only update if there's something to update
       if (Object.keys(updateData).length > 0) {
         return await this.prisma.shipment.update({
           where: { id },
