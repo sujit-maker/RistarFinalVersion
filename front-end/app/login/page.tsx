@@ -94,7 +94,7 @@ export default function LoginPage() {
               </div>
             </div>
             <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-white dark:to-gray-200 bg-clip-text text-transparent">
-              Welcome Back
+              Welcome
             </CardTitle>
             <CardDescription className="text-center text-slate-600 dark:text-slate-400">
               Sign in to your Ristar Logistics account

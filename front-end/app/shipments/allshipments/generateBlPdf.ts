@@ -2,10 +2,11 @@ import jsPDF from "jspdf";
 import axios from "axios";
 import dayjs from "dayjs";
 
-const ristarLogoBase64 = "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABj 'lines tariff.',AAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAEPA5kDASIAAhEBAxEB/8QAHgABAAICAgMBAAAAAAAAAAAAAAgJBgcBBQIDBAr/xABvEAABAgUCAwUDBQgHDRMJCQEBAgMABAUGEQcIEiExCRNBUWEUInEVIzKBkRVCUmJyobGyCR";
+const ristarLogoBase64 =
+  "/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABj 'lines tariff.',AAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAEPA5kDASIAAhEBAxEB/8QAHgABAAICAgMBAAAAAAAAAAAAAAgJBgcBBQIDBAr/xABvEAABAgUCAwUDBQgHDRMJCQEBAgMABAUGEQcIEiExCRNBUWEUInEVIzKBkRVCUmJyobGyCR";
 
 // Define BL types
-export type BLType = 'original' | 'draft' | 'seaway';
+export type BLType = "original" | "draft" | "seaway";
 
 export interface BLFormData {
   shipmentId: number;
@@ -34,7 +35,14 @@ export interface BLFormData {
   containers: any[];
 }
 
-function addTextWithSpacing(doc: any, label: string, value: string, x: number, y: number, labelWidth: number = 45) {
+function addTextWithSpacing(
+  doc: any,
+  label: string,
+  value: string,
+  x: number,
+  y: number,
+  labelWidth: number = 45
+) {
   doc.setFont("arial", "bold");
   doc.setFontSize(10);
   doc.text(label, x, y);
@@ -45,12 +53,12 @@ function addTextWithSpacing(doc: any, label: string, value: string, x: number, y
 
 // Normalize text heading into PDF to avoid odd spacing issues
 function normalizePdfText(input: string): string {
-  return (input || '')
-    .replace(/\u00A0/g, ' ') // non-breaking space
-    .replace(/[\u200B-\u200D\uFEFF]/g, '') // zero-width chars
+  return (input || "")
+    .replace(/\u00A0/g, " ") // non-breaking space
+    .replace(/[\u200B-\u200D\uFEFF]/g, "") // zero-width chars
     .replace(/[“”]/g, '"')
     .replace(/[’‘]/g, "'")
-    .replace(/\s+/g, ' ') // collapse multiple spaces
+    .replace(/\s+/g, " ") // collapse multiple spaces
     .replace(/\u2019/g, "'") // smart apostrophe
     .replace(/\u2013/g, "-") // en dash
     .replace(/\u2014/g, "--") // em dash
@@ -77,64 +85,73 @@ export async function generateBlPdf(
   // First calculate the required content height based on filled fields
   const calculateRequiredHeight = () => {
     let totalHeight = 0;
-    
+
     // Base header height (constant): ~150mm
     totalHeight += 150;
-    
+
     // Container section height (varies based on containers): ~50-80mm
-    const containersToShow = (blFormData?.containers && blFormData.containers.length > 0) 
-      ? blFormData.containers 
-      : [];
-    
+    const containersToShow =
+      blFormData?.containers && blFormData.containers.length > 0
+        ? blFormData.containers
+        : [];
+
     if (containersToShow.length > 3) {
       // If more than 3 containers, they go to a separate page
       totalHeight += 50; // Just the notice text
     } else if (containersToShow.length === 1) {
       // For 1 container, keep the current height calculation
-      const containerHeightMm = Math.max(60, 60 + (1 * 20)); // 80mm for single container
+
+      const containerHeightMm = Math.max(60, 60 + 1 * 20); // 80mm for single container
       totalHeight += containerHeightMm;
     } else {
       // For 2 and 3 containers, reduce height to minimize empty space
-      const containerHeightMm = 60 + (containersToShow.length * 5); // Further reduced from 8 to 5mm per container
+      const containerHeightMm = 60 + containersToShow.length * 5; // Further reduced from 8 to 5mm per container
       totalHeight += containerHeightMm;
     }
-    
+
     // Bottom section (delivery agent, freight, etc.): ~50mm
     totalHeight += 50;
-    
+
     // Terms section height (varies based on charges content)
     let termsHeight = 0;
     if (blFormData?.chargesAndFees && blFormData.chargesAndFees.trim()) {
       // Estimate height based on charges content length
       const chargesLength = blFormData.chargesAndFees.length;
-      termsHeight = Math.max(80, Math.min(120, 80 + (chargesLength / 100) * 10));
+      termsHeight = Math.max(
+        80,
+        Math.min(120, 80 + (chargesLength / 100) * 10)
+      );
     } else {
       // Minimal height when no charges
       termsHeight = 60;
     }
     totalHeight += termsHeight;
-    
+
     // Bottom margin
     totalHeight += 20;
-    
+
     // Minimum height for proper proportions
     return Math.max(totalHeight, 250);
   };
-  
+
   const dynamicPageHeight = calculateRequiredHeight();
-  
-      // Create PDF with A3 width and calculated dynamic height
-    const doc = new jsPDF('p', 'mm', [297, dynamicPageHeight]);
 
-    // Get container count early for dynamic positioning calculations
-    const containersToShow = (blFormData?.containers && blFormData.containers.length > 0) 
-      ? blFormData.containers 
+  // Create PDF with A3 width and calculated dynamic height
+  const doc = new jsPDF("p", "mm", [297, dynamicPageHeight]);
+
+  // Get container count early for dynamic positioning calculations
+  const containersToShow =
+    blFormData?.containers && blFormData.containers.length > 0
+      ? blFormData.containers
       : [];
-    const actualContainerCount = containersToShow.length;
+  const actualContainerCount = containersToShow.length;
 
-    try {
-      // Fetch shipment data for additional info like ports and vessel details
-    console.log("Starting BL PDF generation for shipment:", formData.shipmentId);
+  try {
+    // Fetch shipment data for additional info like ports and vessel details
+    console.log(
+      "Starting BL PDF generation for shipment:",
+      formData.shipmentId
+    );
     const [shipmentRes, addressBooksRes, productsRes] = await Promise.all([
       axios.get(`http://localhost:8000/shipment/${formData.shipmentId}`),
       axios.get(`http://localhost:8000/addressbook`),
@@ -146,39 +163,45 @@ export async function generateBlPdf(
     const products = productsRes.data;
 
     // Use BL form data instead of address book lookups - prefer combined fields
-    const shipper = blFormData ? {
-      combinedInfo: blFormData.shipperInfo,
-      companyName: blFormData.shippersName,
-      address: blFormData.shippersAddress,
-      phone: blFormData.shippersContactNo,
-      email: blFormData.shippersEmail
-    } : {
-      companyName: formData.shipper || '',
-      address: '',
-      phone: '',
-      email: ''
-    };
+    const shipper = blFormData
+      ? {
+          combinedInfo: blFormData.shipperInfo,
+          companyName: blFormData.shippersName,
+          address: blFormData.shippersAddress,
+          phone: blFormData.shippersContactNo,
+          email: blFormData.shippersEmail,
+        }
+      : {
+          companyName: formData.shipper || "",
+          address: "",
+          phone: "",
+          email: "",
+        };
 
-    const consignee = blFormData ? {
-      combinedInfo: blFormData.consigneeInfo,
-      companyName: blFormData.consigneeName,
-      address: blFormData.consigneeAddress,
-      phone: blFormData.consigneeContactNo,
-      email: blFormData.consigneeEmail
-    } : {
-      companyName: formData.consignee || '',
-      address: '',
-      phone: '',
-      email: ''
-    };
+    const consignee = blFormData
+      ? {
+          combinedInfo: blFormData.consigneeInfo,
+          companyName: blFormData.consigneeName,
+          address: blFormData.consigneeAddress,
+          phone: blFormData.consigneeContactNo,
+          email: blFormData.consigneeEmail,
+        }
+      : {
+          companyName: formData.consignee || "",
+          address: "",
+          phone: "",
+          email: "",
+        };
 
-    const notifyParty = blFormData ? {
-      combinedInfo: blFormData.notifyPartyInfo,
-      companyName: blFormData.notifyPartyName,
-      address: blFormData.notifyPartyAddress,
-      phone: blFormData.notifyPartyContactNo,
-      email: blFormData.notifyPartyEmail
-    } : consignee;
+    const notifyParty = blFormData
+      ? {
+          combinedInfo: blFormData.notifyPartyInfo,
+          companyName: blFormData.notifyPartyName,
+          address: blFormData.notifyPartyAddress,
+          phone: blFormData.notifyPartyContactNo,
+          email: blFormData.notifyPartyEmail,
+        }
+      : consignee;
 
     // Get product information
     const product = products.find((p: any) => p.id === shipment.productId);
@@ -188,49 +211,61 @@ export async function generateBlPdf(
     const shippedOnboardDate = dayjs(shipment.gsDate).format("DD.MM.YYYY");
 
     // Derive ports and labels
-    const polName = shipment.polPort?.portName || '';
-    const podName = shipment.podPort?.portName || '';
+    const polName = shipment.polPort?.portName || "";
+    const podName = shipment.podPort?.portName || "";
 
     // Container and weights from BL form or shipment
     const containers = shipment.containers || [];
-    const sealNumber = blFormData?.sealNo || containers[0]?.sealNumber || '';
-    
+    const sealNumber = blFormData?.sealNo || containers[0]?.sealNumber || "";
+
     // Use weights from BL form if available
-    const grossWeight = blFormData ? blFormData.grossWt : formData.grossWeight || '';
-    const netWeight = blFormData ? blFormData.netWt : formData.netWeight || '';
-    
+    const grossWeight = blFormData
+      ? blFormData.grossWt
+      : formData.grossWeight || "";
+    const netWeight = blFormData ? blFormData.netWt : formData.netWeight || "";
+
     // Use delivery agent info from BL form - prefer combined field
-    const deliveryAgent = blFormData ? {
-      combinedInfo: blFormData.deliveryAgentInfo,
-      name: blFormData.deliveryAgentName,
-      address: blFormData.deliveryAgentAddress,
-      contactNo: blFormData.deliveryAgentContactNo,
-      email: blFormData.deliveryAgentEmail,
-      vat: blFormData.Vat
-    } : null;
-    
+    const deliveryAgent = blFormData
+      ? {
+          combinedInfo: blFormData.deliveryAgentInfo,
+          name: blFormData.deliveryAgentName,
+          address: blFormData.deliveryAgentAddress,
+          contactNo: blFormData.deliveryAgentContactNo,
+          email: blFormData.deliveryAgentEmail,
+          vat: blFormData.Vat,
+        }
+      : null;
+
     // Use freight amount from BL form - it's mapped as freightCharges in the pdfData
     // const freightAmount = blFormData?.freightAmount || formData?.freightCharges || '';
-    
+
     // Use BL details from form
-    const blDetails = blFormData?.billofLadingDetails || '';
-    
+    const blDetails = blFormData?.billofLadingDetails || "";
+
     const parseWeight = (weightStr: string) => {
-      const w = typeof weightStr === 'string' ? weightStr.replace(/[^0-9.]/g, '') : weightStr;
-      const n = parseFloat(w || '');
+      const w =
+        typeof weightStr === "string"
+          ? weightStr.replace(/[^0-9.]/g, "")
+          : weightStr;
+      const n = parseFloat(w || "");
       return isNaN(n) ? null : n;
     };
-    
+
     const grossWeightNum = parseWeight(grossWeight);
     const netWeightNum = parseWeight(netWeight);
-    
+
     const formatKgs = (n: number | null, decimals: number) => {
-      if (n === null) return '';
-      return new Intl.NumberFormat('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n) + ' KGS';
+      if (n === null) return "";
+      return (
+        new Intl.NumberFormat("en-IN", {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        }).format(n) + " KGS"
+      );
     };
-    
-    const grossKgsShort = formatKgs(grossWeightNum, 2);   // e.g., 20,030.00 KGS
-    const grossKgsLong = formatKgs(grossWeightNum, 3);    // e.g., 20,030.000 KGS
+
+    const grossKgsShort = formatKgs(grossWeightNum, 2); // e.g., 20,030.00 KGS
+    const grossKgsLong = formatKgs(grossWeightNum, 3); // e.g., 20,030.000 KGS
     const netKgsShort = formatKgs(netWeightNum, 2);
     const netKgsLong = formatKgs(netWeightNum, 3);
 
@@ -250,7 +285,7 @@ export async function generateBlPdf(
     if ((doc as any).setLineHeightFactor) {
       (doc as any).setLineHeightFactor(1.05);
     }
-    
+
     // Page metrics
     const pageWidth = (doc as any).internal.pageSize.getWidth
       ? (doc as any).internal.pageSize.getWidth()
@@ -269,14 +304,14 @@ export async function generateBlPdf(
     doc.setLineWidth(0.5);
     // Draw outer border with calculated dimensions
     doc.line(marginX, marginY, marginX + contentWidth, marginY); // top
-    
+
     // Track border positions - will be updated after terms section is calculated
     let bottomBorderY = dynamicPageHeight - 15; // Default position
     let leftBorderY = bottomBorderY; // Track left border position
     let rightBorderY = bottomBorderY; // Track right border position
     // Vertical borders will be drawn later after calculating correct position
     // Bottom border will be drawn later after calculating correct position
-    
+
     // Header big box and split column like first image
     // Move header up to overlap the outer border top (removes the top gap/second line)
     const headerTop = marginY;
@@ -299,72 +334,96 @@ export async function generateBlPdf(
     const sectionPadding = 5; // Reduced title padding
     const fieldSpacing = 3; // Space between fields
     const sectionGap = 3; // Reduced gap between sections
-    
+
     // Much smaller section heights to preserve space for footer
     const shipperMaxHeight = 24; // Significantly reduced
-    const consigneeMaxHeight = 24; // Significantly reduced  
+    const consigneeMaxHeight = 24; // Significantly reduced
     const notifyMaxHeight = 24; // Significantly reduced
-    
+
     // SHIPPER section - very compact
     doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    doc.text('Shipper', leftX, y);
+    doc.setFont("arial", "bold");
+    doc.text("Shipper", leftX, y);
     y += sectionPadding;
-    
+
     const shipperStartY = y;
     let currentFieldY = y;
-    
+
     // Use combined shipper info if available, otherwise fall back to individual fields
     if (shipper?.combinedInfo && shipper.combinedInfo.trim()) {
       // Use combined field like charges and fees
-      doc.setFont('arial', 'normal');
+      doc.setFont("arial", "normal");
       doc.setFontSize(10);
-      const combinedLines = doc.splitTextToSize(shipper.combinedInfo, leftMaxWidth);
-      
+      const combinedLines = doc.splitTextToSize(
+        shipper.combinedInfo,
+        leftMaxWidth
+      );
+
       // Display as many lines as fit in the available space
       combinedLines.forEach((line: string, index: number) => {
-        if (currentFieldY + (index * 4) < shipperStartY + shipperMaxHeight - 2) {
-          doc.text(line, leftX, currentFieldY + (index * 4));
+        if (currentFieldY + index * 4 < shipperStartY + shipperMaxHeight - 2) {
+          doc.text(line, leftX, currentFieldY + index * 4);
         }
       });
     } else {
       // Fallback to individual fields if combined field is empty
       // Shipper Name - Bold (only if space available)
-      if (shipper?.companyName && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
-        doc.setFont('arial', 'bold');
+      if (
+        shipper?.companyName &&
+        currentFieldY < shipperStartY + shipperMaxHeight - 4
+      ) {
+        doc.setFont("arial", "bold");
         doc.setFontSize(10);
-        const nameLines = doc.splitTextToSize(shipper.companyName, leftMaxWidth);
+        const nameLines = doc.splitTextToSize(
+          shipper.companyName,
+          leftMaxWidth
+        );
         doc.text(nameLines[0], leftX, currentFieldY); // Only first line
         currentFieldY += 4;
       }
-      
+
       // Shipper Address - Normal (only if space available)
-      if (shipper?.address && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        shipper?.address &&
+        currentFieldY < shipperStartY + shipperMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
         const addressLines = doc.splitTextToSize(shipper.address, leftMaxWidth);
         doc.text(addressLines[0], leftX, currentFieldY); // Only first line
         currentFieldY += 4;
       }
-      
+
       // Shipper Phone - Normal (only if space available)
-      if (shipper?.phone && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        shipper?.phone &&
+        currentFieldY < shipperStartY + shipperMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const telLines = doc.splitTextToSize(`TEL: ${shipper.phone}`, leftMaxWidth);
+        const telLines = doc.splitTextToSize(
+          `TEL: ${shipper.phone}`,
+          leftMaxWidth
+        );
         doc.text(telLines[0], leftX, currentFieldY);
         currentFieldY += 4;
       }
-      
+
       // Shipper Email - Normal (only if space available)
-      if (shipper?.email && currentFieldY < shipperStartY + shipperMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        shipper?.email &&
+        currentFieldY < shipperStartY + shipperMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const emailLines = doc.splitTextToSize(`EMAIL: ${shipper.email}`, leftMaxWidth);
+        const emailLines = doc.splitTextToSize(
+          `EMAIL: ${shipper.email}`,
+          leftMaxWidth
+        );
         doc.text(emailLines[0], leftX, currentFieldY);
       }
     }
-    
+
     // Fixed shipper underline position
     const shipperUnderlineY = headerTop + 6 + sectionPadding + shipperMaxHeight;
     doc.setLineWidth(0.4);
@@ -374,256 +433,365 @@ export async function generateBlPdf(
     // CONSIGNEE section - very compact (shifted slightly down from underline)
     y = shipperUnderlineY + sectionGap + 2;
     doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    doc.text('Consignee (or order)', leftX, y);
+    doc.setFont("arial", "bold");
+    doc.text("Consignee (or order)", leftX, y);
     y += sectionPadding;
-    
+
     const consigneeStartY = y;
     currentFieldY = y;
-    
+
     // Use combined consignee info if available, otherwise fall back to individual fields
     if (consignee?.combinedInfo && consignee.combinedInfo.trim()) {
       // Use combined field like charges and fees
-      doc.setFont('arial', 'normal');
+      doc.setFont("arial", "normal");
       doc.setFontSize(10);
-      const combinedLines = doc.splitTextToSize(consignee.combinedInfo, leftMaxWidth);
-      
+      const combinedLines = doc.splitTextToSize(
+        consignee.combinedInfo,
+        leftMaxWidth
+      );
+
       // Display as many lines as fit in the available space
       combinedLines.forEach((line: string, index: number) => {
-        if (currentFieldY + (index * 4) < consigneeStartY + consigneeMaxHeight - 2) {
-          doc.text(line, leftX, currentFieldY + (index * 4));
+        if (
+          currentFieldY + index * 4 <
+          consigneeStartY + consigneeMaxHeight - 2
+        ) {
+          doc.text(line, leftX, currentFieldY + index * 4);
         }
       });
     } else {
       // Fallback to individual fields if combined field is empty
       // Consignee Name - Bold (only if space available)
-      if (consignee?.companyName && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
-        doc.setFont('arial', 'bold');
+      if (
+        consignee?.companyName &&
+        currentFieldY < consigneeStartY + consigneeMaxHeight - 4
+      ) {
+        doc.setFont("arial", "bold");
         doc.setFontSize(10);
-        const nameLines = doc.splitTextToSize(consignee.companyName, leftMaxWidth);
+        const nameLines = doc.splitTextToSize(
+          consignee.companyName,
+          leftMaxWidth
+        );
         doc.text(nameLines[0], leftX, currentFieldY); // Only first line
         currentFieldY += 4;
       }
-      
+
       // Consignee Address - Normal (only if space available)
-      if (consignee?.address && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        consignee?.address &&
+        currentFieldY < consigneeStartY + consigneeMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const addressLines = doc.splitTextToSize(consignee.address, leftMaxWidth);
+        const addressLines = doc.splitTextToSize(
+          consignee.address,
+          leftMaxWidth
+        );
         doc.text(addressLines[0], leftX, currentFieldY); // Only first line
         currentFieldY += 4;
       }
-      
+
       // Consignee Phone - Normal (only if space available)
-      if (consignee?.phone && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        consignee?.phone &&
+        currentFieldY < consigneeStartY + consigneeMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const telLines = doc.splitTextToSize(`TEL: ${consignee.phone}`, leftMaxWidth);
+        const telLines = doc.splitTextToSize(
+          `TEL: ${consignee.phone}`,
+          leftMaxWidth
+        );
         doc.text(telLines[0], leftX, currentFieldY);
         currentFieldY += 4;
       }
-      
+
       // Consignee Email - Normal (only if space available)
-      if (consignee?.email && currentFieldY < consigneeStartY + consigneeMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        consignee?.email &&
+        currentFieldY < consigneeStartY + consigneeMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const emailLines = doc.splitTextToSize(`EMAIL: ${consignee.email}`, leftMaxWidth);
+        const emailLines = doc.splitTextToSize(
+          `EMAIL: ${consignee.email}`,
+          leftMaxWidth
+        );
         doc.text(emailLines[0], leftX, currentFieldY);
       }
     }
-    
+
     // Fixed consignee underline position
-    const consigneeUnderlineY = shipperUnderlineY + sectionGap + sectionPadding + consigneeMaxHeight;
+    const consigneeUnderlineY =
+      shipperUnderlineY + sectionGap + sectionPadding + consigneeMaxHeight;
     // Extend underline fully to the panel borders (no side gaps)
-    doc.line(headerLeft, consigneeUnderlineY, headerSplitX, consigneeUnderlineY);
+    doc.line(
+      headerLeft,
+      consigneeUnderlineY,
+      headerSplitX,
+      consigneeUnderlineY
+    );
 
     // NOTIFY PARTY section - very compact (shifted slightly down from underline)
     y = consigneeUnderlineY + sectionGap + 2;
     doc.setFontSize(11);
-    doc.setFont('arial', 'bold');
-    doc.text('Notify Party', leftX, y);
+    doc.setFont("arial", "bold");
+    doc.text("Notify Party", leftX, y);
     y += sectionPadding;
-    
+
     const notifyStartY = y;
     currentFieldY = y;
-    
+
     // Use combined notify party info if available, otherwise fall back to individual fields
     if (notifyParty?.combinedInfo && notifyParty.combinedInfo.trim()) {
       // Use combined field like charges and fees
-      doc.setFont('arial', 'normal');
+      doc.setFont("arial", "normal");
       doc.setFontSize(10);
-      const combinedLines = doc.splitTextToSize(notifyParty.combinedInfo, leftMaxWidth);
-      
+      const combinedLines = doc.splitTextToSize(
+        notifyParty.combinedInfo,
+        leftMaxWidth
+      );
+
       // Display as many lines as fit in the available space
       combinedLines.forEach((line: string, index: number) => {
-        if (currentFieldY + (index * 4) < notifyStartY + notifyMaxHeight - 2) {
-          doc.text(line, leftX, currentFieldY + (index * 4));
+        if (currentFieldY + index * 4 < notifyStartY + notifyMaxHeight - 2) {
+          doc.text(line, leftX, currentFieldY + index * 4);
         }
       });
     } else {
       // Fallback to individual fields if combined field is empty
       // Notify Party Name - Bold (only if space available)
-      if (notifyParty?.companyName && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
-        doc.setFont('arial', 'bold');
+      if (
+        notifyParty?.companyName &&
+        currentFieldY < notifyStartY + notifyMaxHeight - 4
+      ) {
+        doc.setFont("arial", "bold");
         doc.setFontSize(10);
-        const nameLines = doc.splitTextToSize(notifyParty.companyName, leftMaxWidth);
+        const nameLines = doc.splitTextToSize(
+          notifyParty.companyName,
+          leftMaxWidth
+        );
         doc.text(nameLines[0], leftX, currentFieldY); // Only first line
         currentFieldY += 4;
       }
-      
+
       // Notify Party Address - Normal (only if space available)
-      if (notifyParty?.address && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        notifyParty?.address &&
+        currentFieldY < notifyStartY + notifyMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const addressLines = doc.splitTextToSize(notifyParty.address, leftMaxWidth);
+        const addressLines = doc.splitTextToSize(
+          notifyParty.address,
+          leftMaxWidth
+        );
         doc.text(addressLines[0], leftX, currentFieldY); // Only first line
         currentFieldY += 4;
       }
-      
+
       // Notify Party Phone - Normal (only if space available)
-      if (notifyParty?.phone && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        notifyParty?.phone &&
+        currentFieldY < notifyStartY + notifyMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const telLines = doc.splitTextToSize(`TEL: ${notifyParty.phone}`, leftMaxWidth);
+        const telLines = doc.splitTextToSize(
+          `TEL: ${notifyParty.phone}`,
+          leftMaxWidth
+        );
         doc.text(telLines[0], leftX, currentFieldY);
         currentFieldY += 4;
       }
-      
+
       // Notify Party Email - Normal (only if space available)
-      if (notifyParty?.email && currentFieldY < notifyStartY + notifyMaxHeight - 4) {
-        doc.setFont('arial', 'normal');
+      if (
+        notifyParty?.email &&
+        currentFieldY < notifyStartY + notifyMaxHeight - 4
+      ) {
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const emailLines = doc.splitTextToSize(`EMAIL: ${notifyParty.email}`, leftMaxWidth);
+        const emailLines = doc.splitTextToSize(
+          `EMAIL: ${notifyParty.email}`,
+          leftMaxWidth
+        );
         doc.text(emailLines[0], leftX, currentFieldY);
       }
     }
-    
+
     // Fixed notify party end position
-    const notifyPartyUnderlineY = consigneeUnderlineY + sectionGap + sectionPadding + notifyMaxHeight;
+    const notifyPartyUnderlineY =
+      consigneeUnderlineY + sectionGap + sectionPadding + notifyMaxHeight;
     const leftBottomY = notifyPartyUnderlineY;
 
     // Right column content: BL number, RISTAR logo, company info, terms paragraph
     let ry = headerTop + 8;
-    
+
     // Get houseBL value for use elsewhere
-    const houseBLValue = blFormData?.houseBL || shipment?.houseBL || '';
-    
-    doc.setFont('arial', 'bold');
+    const houseBLValue = blFormData?.houseBL || shipment?.houseBL || "";
+
+    doc.setFont("arial", "bold");
     doc.setFontSize(12);
     // Use houseBL as the main BL number if available, otherwise use the generated BL number
-    const actualBlNumber = houseBLValue || blFormData?.blNumber || formData?.blNumber || `BL RST/NSADMN/25/${String(formData.shipmentId).padStart(5, '0')}`;
+    const actualBlNumber =
+      houseBLValue ||
+      blFormData?.blNumber ||
+      formData?.blNumber ||
+      `BL RST/NSADMN/25/${String(formData.shipmentId).padStart(5, "0")}`;
     doc.text(actualBlNumber, rightX, ry);
     ry += 8;
     // Insert company logo image from public folder in marked area - centered horizontally
     try {
-      const logoDataUrl = await loadImageAsDataURL('/crologo.jpg');
+      const logoDataUrl = await loadImageAsDataURL("/crologo.jpg");
       const logoMaxWidth = Math.min(rightMaxWidth, 90);
       const aspectRatio = 271 / 921; // based on provided image dimensions
       const logoHeight = logoMaxWidth * aspectRatio;
       // Center the logo horizontally within the right panel
       const logoCenterX = rightX + (rightMaxWidth - logoMaxWidth) / 2;
-      doc.addImage(logoDataUrl, 'JPEG', logoCenterX, ry, logoMaxWidth, logoHeight);
+      doc.addImage(
+        logoDataUrl,
+        "JPEG",
+        logoCenterX,
+        ry,
+        logoMaxWidth,
+        logoHeight
+      );
       ry += logoHeight + 8;
     } catch (e) {
       // Fallback: keep spacing even if image fails to load
       ry += 22;
     }
-    doc.setFont('arial', 'bold');
+    doc.setFont("arial", "bold");
     doc.setFontSize(12);
     // Center the company name horizontally
     const companyNameCenterX = rightX + rightMaxWidth / 2;
-    doc.text('RISTAR LOGISTICS PVT LTD', companyNameCenterX, ry, { align: 'center' });
-    doc.setFont('arial', 'bold');
+    doc.text("RISTAR LOGISTICS PVT LTD", companyNameCenterX, ry, {
+      align: "center",
+    });
+    doc.setFont("arial", "bold");
     doc.setFontSize(12); // Increased font size from 10 to 12
-    let rLines = doc.splitTextToSize('Office No. C- 0010, Akshar Business Park, Plot No 3, Sector 25, Vashi Navi Mumbai - 400703', rightMaxWidth);
+    let rLines = doc.splitTextToSize(
+      "Office No. C- 0010, Akshar Business Park, Plot No 3, Sector 25, Vashi Navi Mumbai - 400703",
+      rightMaxWidth
+    );
     // Center the address text
-    doc.text(rLines, companyNameCenterX, ry + 12, { align: 'center' });
+    doc.text(rLines, companyNameCenterX, ry + 12, { align: "center" });
     ry += 6 + rLines.length * 5 + 3;
     doc.setFontSize(9);
     // Terms block with dynamic fitting
     const maxRightTermsY = headerTop + 120; // Maximum Y for right terms to prevent overlap
     const termsBlock = [
-      'Taken in charge in apparently good condition herein at the place of receipt for transport and delivery as mentioned above, unless otherwise stated. The MTO in accordance with the provision contained in the MTD undertakes to perform or to procure the performance of the multimodal transport from the place at which the goods are taken in charge, to the place designated for delivery and assumes responsibility for such transport. Once of the MTD(s) must be surrendered, duty endorsed in exchange for the goods. In witness where of the original MTD all of this tenor and date have been signed in the number indicated below one of which accomplished the other(s) to be void.',
+      "Taken in charge in apparently good condition herein at the place of receipt for transport and delivery as mentioned above, unless otherwise stated. The MTO in accordance with the provision contained in the MTD undertakes to perform or to procure the performance of the multimodal transport from the place at which the goods are taken in charge, to the place designated for delivery and assumes responsibility for such transport. Once of the MTD(s) must be surrendered, duty endorsed in exchange for the goods. In witness where of the original MTD all of this tenor and date have been signed in the number indicated below one of which accomplished the other(s) to be void.",
     ];
-    const termsWrapped = doc.splitTextToSize(termsBlock.join(' '), rightMaxWidth);
-    
+    const termsWrapped = doc.splitTextToSize(
+      termsBlock.join(" "),
+      rightMaxWidth
+    );
+
     // Calculate available space and limit text if needed
-const availableSpace = maxRightTermsY - (ry + 10);
-const maxTermsLines = Math.floor(availableSpace / 3.2);
-const displayedTerms = termsWrapped.slice(0, maxTermsLines);
+    const availableSpace = maxRightTermsY - (ry + 10);
+    const maxTermsLines = Math.floor(availableSpace / 3.2);
+    const displayedTerms = termsWrapped.slice(0, maxTermsLines);
 
-doc.text(displayedTerms, rightX, ry + 10);
-const rightBottomY = ry + displayedTerms.length * 3.2;
+    doc.text(displayedTerms, rightX, ry + 10);
+    const rightBottomY = ry + displayedTerms.length * 3.2;
 
-// Determine header height dynamically
-const contentBottomY = Math.max(leftBottomY, rightBottomY);
-const portsTop = contentBottomY + 2; // Reduced from 4 to 2 to shift content up
-const rowH = 10; // Reduced from 12 to 10 to save space
-const portsHeight = rowH * 4; // four stacked rows on left
-const totalHeaderHeight = (portsTop - headerTop) + portsHeight + 2;
+    // Determine header height dynamically
+    const contentBottomY = Math.max(leftBottomY, rightBottomY);
+    const portsTop = contentBottomY + 2; // Reduced from 4 to 2 to shift content up
+    const rowH = 10; // Reduced from 12 to 10 to save space
+    const portsHeight = rowH * 4; // four stacked rows on left
+    const totalHeaderHeight = portsTop - headerTop + portsHeight + 2;
 
-// Draw header box (omit top edge so only the outer border top line is visible)
-doc.setLineWidth(0.5);
-// left edge
-doc.line(headerLeft, headerTop, headerLeft, headerTop + totalHeaderHeight);
-// bottom edge
-doc.line(headerLeft, headerTop + totalHeaderHeight, headerLeft + headerWidth, headerTop + totalHeaderHeight);
-// right edge
-doc.line(headerLeft + headerWidth, headerTop, headerLeft + headerWidth, headerTop + totalHeaderHeight);
-doc.line(headerSplitX, headerTop, headerSplitX, headerTop + totalHeaderHeight);
-// Separator above ports grid (left panel only)
-doc.line(headerLeft, portsTop, headerSplitX, portsTop);
+    // Draw header box (omit top edge so only the outer border top line is visible)
+    doc.setLineWidth(0.5);
+    // left edge
+    doc.line(headerLeft, headerTop, headerLeft, headerTop + totalHeaderHeight);
+    // bottom edge
+    doc.line(
+      headerLeft,
+      headerTop + totalHeaderHeight,
+      headerLeft + headerWidth,
+      headerTop + totalHeaderHeight
+    );
+    // right edge
+    doc.line(
+      headerLeft + headerWidth,
+      headerTop,
+      headerLeft + headerWidth,
+      headerTop + totalHeaderHeight
+    );
+    doc.line(
+      headerSplitX,
+      headerTop,
+      headerSplitX,
+      headerTop + totalHeaderHeight
+    );
+    // Separator above ports grid (left panel only)
+    doc.line(headerLeft, portsTop, headerSplitX, portsTop);
 
-doc.setFontSize(11);
-doc.setFont('arial', 'bold');
-const pLeftX = headerLeft + 5;
-const innerSplitX = headerLeft + Math.floor((headerSplitX - headerLeft) / 2);
-const pMidX = innerSplitX + 5; // right side of the left panel
+    doc.setFontSize(11);
+    doc.setFont("arial", "bold");
+    const pLeftX = headerLeft + 5;
+    const innerSplitX =
+      headerLeft + Math.floor((headerSplitX - headerLeft) / 2);
+    const pMidX = innerSplitX + 5; // right side of the left panel
 
-// Row 1: Place Of Acceptance only
-doc.text('Place Of Acceptance', pLeftX, portsTop + 4);
-doc.setFontSize(10);
-doc.setFont('arial', 'normal');
-doc.text(polName || '', pLeftX, portsTop + 9);
+    // Row 1: Place Of Acceptance only
+    doc.text("Place Of Acceptance", pLeftX, portsTop + 4);
+    doc.setFontSize(10);
+    doc.setFont("arial", "normal");
+    doc.text(polName || "", pLeftX, portsTop + 9);
 
-// underline row 1
-doc.line(headerLeft, portsTop + rowH, headerSplitX, portsTop + rowH);
+    // underline row 1
+    doc.line(headerLeft, portsTop + rowH, headerSplitX, portsTop + rowH);
 
-// Row 2: Port Of Loading (left) + Port Of Discharge (right)
-doc.setFontSize(11);
-doc.setFont('arial', 'bold');
-doc.text('Port Of Loading', pLeftX, portsTop + rowH + 4);
-doc.setFontSize(10);
-doc.setFont('arial', 'normal');
-doc.text(polName || '', pLeftX, portsTop + rowH + 9);
+    // Row 2: Port Of Loading (left) + Port Of Discharge (right)
+    doc.setFontSize(11);
+    doc.setFont("arial", "bold");
+    doc.text("Port Of Loading", pLeftX, portsTop + rowH + 4);
+    doc.setFontSize(10);
+    doc.setFont("arial", "normal");
+    doc.text(polName || "", pLeftX, portsTop + rowH + 9);
 
-doc.setFontSize(11);
-doc.setFont('arial', 'bold');
-doc.text('Port Of Discharge', pMidX, portsTop + rowH + 4);
-doc.setFontSize(10);
-doc.setFont('arial', 'normal');
-doc.text(podName || '', pMidX, portsTop + rowH + 9);
+    doc.setFontSize(11);
+    doc.setFont("arial", "bold");
+    doc.text("Port Of Discharge", pMidX, portsTop + rowH + 4);
+    doc.setFontSize(10);
+    doc.setFont("arial", "normal");
+    doc.text(podName || "", pMidX, portsTop + rowH + 9);
 
-// underline row 2
-doc.line(headerLeft, portsTop + rowH * 2, headerSplitX, portsTop + rowH * 2);
+    // underline row 2
+    doc.line(
+      headerLeft,
+      portsTop + rowH * 2,
+      headerSplitX,
+      portsTop + rowH * 2
+    );
 
-// Row 3: Place Of Delivery
-doc.setFontSize(11);
-doc.setFont('arial', 'bold');
-doc.text('Place Of Delivery', pLeftX, portsTop + rowH * 2 + 4);
-doc.setFont('arial', 'normal');
-doc.text(podName || '', pLeftX, portsTop + rowH * 2 + 9);
+    // Row 3: Place Of Delivery
+    doc.setFontSize(11);
+    doc.setFont("arial", "bold");
+    doc.text("Place Of Delivery", pLeftX, portsTop + rowH * 2 + 4);
+    doc.setFont("arial", "normal");
+    doc.text(podName || "", pLeftX, portsTop + rowH * 2 + 9);
 
-// underline row 3
-doc.line(headerLeft, portsTop + rowH * 3, headerSplitX, portsTop + rowH * 3);
+    // underline row 3
+    doc.line(
+      headerLeft,
+      portsTop + rowH * 3,
+      headerSplitX,
+      portsTop + rowH * 3
+    );
 
-// Row 4: Vessel & Voyage No.
-doc.setFontSize(11);
-doc.setFont('arial', 'bold');
-doc.text('Vessel & Voyage No.', pLeftX, portsTop + rowH * 3 + 4);
-doc.setFontSize(10);
-doc.setFont('arial', 'normal');
-doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
+    // Row 4: Vessel & Voyage No.
+    doc.setFontSize(11);
+    doc.setFont("arial", "bold");
+    doc.text("Vessel & Voyage No.", pLeftX, portsTop + rowH * 3 + 4);
+    doc.setFontSize(10);
+    doc.setFont("arial", "normal");
+    doc.text(shipment.vesselName || "", pLeftX, portsTop + rowH * 3 + 10);
 
     // Removed final underline to avoid double line with the header box bottom border
 
@@ -631,37 +799,37 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     let yPos = headerTop + totalHeaderHeight + 3;
     const blTitleY = portsTop + rowH * 2 + 12; // Increased from 6 to 12 to move it down more
     doc.setFontSize(18);
-    doc.setFont('arial', 'bold');
+    doc.setFont("arial", "bold");
     // Dynamic BL title based on copy number and type
-    let blTypeText = '';
-    if (blType === 'original') {
+    let blTypeText = "";
+    if (blType === "original") {
       if (copyNumber === 0) {
-        blTypeText = '1st ORIGINAL B/L';
+        blTypeText = "1st ORIGINAL B/L";
       } else if (copyNumber === 1) {
-        blTypeText = '2nd ORIGINAL B/L';
+        blTypeText = "2nd ORIGINAL B/L";
       } else if (copyNumber === 2) {
-        blTypeText = '3rd ORIGINAL B/L';
+        blTypeText = "3rd ORIGINAL B/L";
       }
-    } else if (blType === 'draft') {
+    } else if (blType === "draft") {
       if (copyNumber === 0) {
-        blTypeText = 'DRAFT B/L';
+        blTypeText = "DRAFT B/L";
       } else if (copyNumber === 1) {
-        blTypeText = '2nd COPY B/L';
+        blTypeText = "2nd COPY B/L";
       } else if (copyNumber === 2) {
-        blTypeText = '3rd COPY B/L';
+        blTypeText = "3rd COPY B/L";
       }
-    } else if (blType === 'seaway') {
+    } else if (blType === "seaway") {
       if (copyNumber === 0) {
-        blTypeText = 'SEAWAY B/L';
+        blTypeText = "SEAWAY B/L";
       } else if (copyNumber === 1) {
-        blTypeText = '2nd COPY B/L';
+        blTypeText = "2nd COPY B/L";
       } else if (copyNumber === 2) {
-        blTypeText = '3rd COPY B/L';
+        blTypeText = "3rd COPY B/L";
       }
     }
     // Move title to the right section centered within the right panel
     const rightPanelCenterX = headerSplitX + (headerRightX - headerSplitX) / 2;
-    doc.text(blTypeText, rightPanelCenterX, blTitleY, { align: 'center' });
+    doc.text(blTypeText, rightPanelCenterX, blTitleY, { align: "center" });
 
     // No extra thick separator before the table region (prevents double lines)
     const tableTop = yPos + 6; // Reduced from 10 to 6 to save space
@@ -675,18 +843,26 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
 
     // Headers
     doc.setFontSize(10);
-    doc.setFont('arial', 'bold');
-    doc.text('Container No.(s)', marginX + 5, tableHeaderY + 2);
-    doc.text('Marks and numbers', marginX + 60, tableHeaderY + 2);
-    doc.text('Number of packages, kinds of packages;', marginX + 110, tableHeaderY +2);
-    doc.text('general description of goods', marginX + 110, tableHeaderY + 6);
+    doc.setFont("arial", "bold");
+    doc.text("Container No.(s)", marginX + 5, tableHeaderY + 2);
+    doc.text("Marks and numbers", marginX + 60, tableHeaderY + 2);
+    doc.text(
+      "Number of packages, kinds of packages;",
+      marginX + 110,
+      tableHeaderY + 2
+    );
+    doc.text("general description of goods", marginX + 110, tableHeaderY + 6);
     // Removed the Gross/Net Weight header while keeping their values below
     // Add a header underline right below the header row
     doc.setLineWidth(0.6);
     const headerUnderlineY = tableHeaderY + 8; // increased header height for table columns
-    doc.line(marginX, headerUnderlineY, marginX + headerWidth, headerUnderlineY);
+    doc.line(
+      marginX,
+      headerUnderlineY,
+      marginX + headerWidth,
+      headerUnderlineY
+    );
 
-    
     // Column x coordinates
     const col1X = marginX;
     const colRightX = marginX + 190;
@@ -698,75 +874,89 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
 
     // Row content
     doc.setFontSize(9);
-    doc.setFont('arial', 'normal');
-    
+    doc.setFont("arial", "normal");
+
     // Display all containers with their details vertically with pagination support
     let containerY = firstRowTextY + 6;
     const maxYOnPage = 250; // Maximum Y coordinate before needing a new page
     const containerSpacing = 12; // Height needed for each container row in table format
-    
     // NEW LOGIC: If more than 3 containers, move ALL containers to next page
     const shouldMoveAllContainersToNextPage = containersToShow.length > 3;
-    
+
     if (shouldMoveAllContainersToNextPage) {
       // Add message in container section indicating containers are on next page
-      doc.setFont('arial', 'bold');
+      doc.setFont("arial", "bold");
       doc.setFontSize(10);
-      doc.text('Find the containers details list below the page annexure.', marginX + 5, containerY + 30);
-      
+      doc.text(
+        "Find the containers details list below the page annexure.",
+        marginX + 5,
+        containerY + 30
+      );
+
       // Update rowEndY to account for the message space
       rowEndY = Math.max(rowEndY, containerY + 20);
-      
+
       // Add new page for all containers
       doc.addPage();
       containerY = 80; // Start lower to accommodate header
-      
+
       // Calculate centered positions for second page
       const page2MarginX = (pageWidth - contentWidth) / 2;
       const page2MarginY = 20;
-      
+
       // Add company header information (centered)
-      doc.setFont('arial', 'bold');
+      doc.setFont("arial", "bold");
       doc.setFontSize(14);
-      doc.text('RISTAR LOGISTICS PVT LTD', pageWidth / 2, page2MarginY + 10, { align: 'center' });
-      
-      doc.setFont('arial', 'bold');
+      doc.text("RISTAR LOGISTICS PVT LTD", pageWidth / 2, page2MarginY + 10, {
+        align: "center",
+      });
+
+      doc.setFont("arial", "bold");
       doc.setFontSize(12);
-      doc.text('B/L ATTACHMENT', pageWidth / 2, page2MarginY + 20, { align: 'center' });
-      
+      doc.text("B/L ATTACHMENT", pageWidth / 2, page2MarginY + 20, {
+        align: "center",
+      });
+
       // Add BL details from form data (centered layout)
-      doc.setFont('arial', 'bold');
+      doc.setFont("arial", "bold");
       doc.setFontSize(10);
-      
-      const houseBLValue = blFormData?.houseBL || shipment?.houseBL || '';
+
+      const houseBLValue = blFormData?.houseBL || shipment?.houseBL || "";
       // Use houseBL as the main BL number if available, otherwise use generated BL number
-      const blNumber = houseBLValue || blFormData?.blNumber || `RST/ NSACMB /25/00179`;
+      const blNumber =
+        houseBLValue || blFormData?.blNumber || `RST/ NSACMB /25/00179`;
       const dateOfIssue = blFormData?.dateOfIssue || blDate;
-      const vesselName = blFormData?.vesselNo || shipment?.vesselName || 'MV. EVER LYRIC 068E';
-      
+      const vesselName =
+        blFormData?.vesselNo || shipment?.vesselName || "MV. EVER LYRIC 068E";
+
       doc.text(`BL NO.`, page2MarginX + 5, page2MarginY + 40);
       doc.text(`: ${blNumber}`, page2MarginX + 70, page2MarginY + 40);
       doc.text(`DATE OF ISSUE`, page2MarginX + 130, page2MarginY + 40);
       doc.text(`: ${dateOfIssue}`, page2MarginX + 180, page2MarginY + 40);
-      
+
       doc.text(`VESSEL NAME / VOYAGE NO`, page2MarginX + 5, page2MarginY + 50);
       doc.text(`: ${vesselName}`, page2MarginX + 70, page2MarginY + 50);
-      
+
       // Draw line separator (centered) - no need for conditional positioning since no more House BL
       const separatorY = page2MarginY + 60;
-      doc.line(page2MarginX + 5, separatorY, page2MarginX + contentWidth - 5, separatorY);
-      
+      doc.line(
+        page2MarginX + 5,
+        separatorY,
+        page2MarginX + contentWidth - 5,
+        separatorY
+      );
+
       // Add container details title (centered)
-      doc.setFont('arial', 'bold');
+      doc.setFont("arial", "bold");
       doc.setFontSize(12);
       const titleY = separatorY + 15;
-      doc.text('CONTAINER DETAILS', pageWidth / 2, titleY, { align: 'center' });
-      
+      doc.text("CONTAINER DETAILS", pageWidth / 2, titleY, { align: "center" });
+
       containerY = titleY + 10; // Adjust for header content
-      
-    // Page number will be added for all pages later ("Page X of Y")
+
+      // Page number will be added for all pages later ("Page X of Y")
     }
-    
+
     // Draw container display based on container count
     if (containersToShow.length > 0) {
       if (containersToShow.length <= 3) {
@@ -774,53 +964,61 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
         const containerStartX = marginX + 15; // Left side position
         const containerStartY = containerY;
         const containerWidth = 120; // Width for vertical container display
-        
-        doc.setFont('arial', 'bold');
+
+        doc.setFont("arial", "bold");
         doc.setFontSize(10);
-        
+
         // Variables to calculate totals
         let totalGrossWt = 0;
         let totalNetWt = 0;
-        
+
         containersToShow.forEach((container: any, index: number) => {
           if (!container.containerNumber) return;
-          
-          const yPos = containerStartY + (index * 40); // Reduced from 45 to 40px spacing between containers
-          
+
+          const yPos = containerStartY + index * 40; // Reduced from 45 to 40px spacing between containers
+
           // Container number - increased font size for better readability
-          doc.setFont('arial', 'normal');
+          doc.setFont("arial", "normal");
           doc.setFontSize(11); // Increased from 9 to 11 for better readability
-          doc.text(container.containerNumber || 'N/A', containerStartX, yPos);
-          
+          doc.text(container.containerNumber || "N/A", containerStartX, yPos);
+
           // Seal number - increased font size for better readability
           doc.setFontSize(10); // Increased from 8 to 10 for better readability
-          doc.text(`SEAL NO: ${container.sealNumber || 'N/A'}`, containerStartX, yPos + 7);
-          
+          doc.text(
+            `SEAL NO: ${container.sealNumber || "N/A"}`,
+            containerStartX,
+            yPos + 7
+          );
+
           // Weights for each container
           const grossWtNum = parseFloat(container.grossWt) || 0;
           const netWtNum = parseFloat(container.netWt) || 0;
           totalGrossWt += grossWtNum;
           totalNetWt += netWtNum;
-          
-          const grossWt = container.grossWt ? `${container.grossWt} KGS` : 'N/A';
-          const netWt = container.netWt ? `${container.netWt} KGS` : 'N/A';
-          
+
+
+          const grossWt = container.grossWt
+            ? `${container.grossWt} KGS`
+            : "N/A";
+          const netWt = container.netWt ? `${container.netWt} KGS` : "N/A";
+
           // Increased font size for weights for better readability
           doc.setFontSize(10); // Increased from 8 to 10 for better readability
           doc.text(`GROSS WT: ${grossWt}`, containerStartX, yPos + 14);
           doc.text(`NET WT: ${netWt}`, containerStartX, yPos + 21);
-          
+
+
           // No separator lines between containers
         });
-        
+
         // Update containerY to position after vertical containers with proper spacing
-        containerY = containerStartY + (containersToShow.length * 40) + 25; // Updated to match reduced container spacing
-        
+
+        containerY = containerStartY + containersToShow.length * 40 + 25; // Updated to match reduced container spacing
+
         // Update rowEndY to account for actual space used by containers
         rowEndY = Math.max(rowEndY, containerY);
-        
+
         // No totals display for 3 or fewer containers as per user request
-        
       } else {
         // Table format for more than 3 containers (existing logic)
         const tableStartY = containerY;
@@ -828,97 +1026,166 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
         const tableWidth = 247;
         const tableX = (pageWidth - tableWidth) / 2; // Center the table on the page
         const col1Width = 70; // CONTAINER NO
-        const col2Width = 62; // PRODUCT GROSS WT  
+        const col2Width = 62; // PRODUCT GROSS WT
         const col3Width = 62; // PRODUCT NET WT
         const col4Width = tableWidth - (col1Width + col2Width + col3Width); // SEAL NO (remainder)
-        
+
         // Table header with borders
-        doc.setFont('arial', 'bold');
+        doc.setFont("arial", "bold");
         doc.setFontSize(10);
-        
+
         // Draw header background and borders
         doc.rect(tableX, tableStartY - 2, tableWidth, 12);
-        
+
         // Header text (centered within each column)
         const cell1CenterX = tableX + col1Width / 2;
         const cell2CenterX = tableX + col1Width + col2Width / 2;
         const cell3CenterX = tableX + col1Width + col2Width + col3Width / 2;
-        const cell4CenterX = tableX + col1Width + col2Width + col3Width + col4Width / 2;
-        doc.text('CONTAINER NO.', cell1CenterX, tableStartY + 6, { align: 'center' });
-        doc.text('GROSS WT', cell2CenterX, tableStartY + 6, { align: 'center' });
-        doc.text('NET WT', cell3CenterX, tableStartY + 6, { align: 'center' });
-        doc.text('SEAL NO.', cell4CenterX, tableStartY + 6, { align: 'center' });
-        
+        const cell4CenterX =
+          tableX + col1Width + col2Width + col3Width + col4Width / 2;
+        doc.text("CONTAINER NO.", cell1CenterX, tableStartY + 6, {
+          align: "center",
+        });
+        doc.text("GROSS WT", cell2CenterX, tableStartY + 6, {
+          align: "center",
+        });
+        doc.text("NET WT", cell3CenterX, tableStartY + 6, { align: "center" });
+        doc.text("SEAL NO.", cell4CenterX, tableStartY + 6, {
+          align: "center",
+        });
+
         // Draw vertical lines for header
-        doc.line(tableX + col1Width, tableStartY - 2, tableX + col1Width, tableStartY + 10);
-        doc.line(tableX + col1Width + col2Width, tableStartY - 2, tableX + col1Width + col2Width, tableStartY + 10);
-        doc.line(tableX + col1Width + col2Width + col3Width, tableStartY - 2, tableX + col1Width + col2Width + col3Width, tableStartY + 10);
-        
+        doc.line(
+          tableX + col1Width,
+          tableStartY - 2,
+          tableX + col1Width,
+          tableStartY + 10
+        );
+        doc.line(
+          tableX + col1Width + col2Width,
+          tableStartY - 2,
+          tableX + col1Width + col2Width,
+          tableStartY + 10
+        );
+        doc.line(
+          tableX + col1Width + col2Width + col3Width,
+          tableStartY - 2,
+          tableX + col1Width + col2Width + col3Width,
+          tableStartY + 10
+        );
+
         containerY = tableStartY + 12;
-        
+
         // Variables to calculate totals
         let totalGrossWt = 0;
         let totalNetWt = 0;
-        
+
         // Container data rows with borders
-        doc.setFont('arial', 'normal');
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        
+
         containersToShow.forEach((container: any, index: number) => {
           if (!container.containerNumber) return;
-          
+
           const rowY = containerY;
-          
+
           // Draw row borders
           doc.rect(tableX, rowY, tableWidth, 12);
-          
+
           // Draw vertical lines for data rows
           doc.line(tableX + col1Width, rowY, tableX + col1Width, rowY + 12);
-          doc.line(tableX + col1Width + col2Width, rowY, tableX + col1Width + col2Width, rowY + 12);
-          doc.line(tableX + col1Width + col2Width + col3Width, rowY, tableX + col1Width + col2Width + col3Width, rowY + 12);
-          
+          doc.line(
+            tableX + col1Width + col2Width,
+            rowY,
+            tableX + col1Width + col2Width,
+            rowY + 12
+          );
+          doc.line(
+            tableX + col1Width + col2Width + col3Width,
+            rowY,
+            tableX + col1Width + col2Width + col3Width,
+            rowY + 12
+          );
+
           // Container data (centered in each column)
-          doc.text(container.containerNumber || 'N/A', cell1CenterX, rowY + 8, { align: 'center' });
-          
+          doc.text(container.containerNumber || "N/A", cell1CenterX, rowY + 8, {
+            align: "center",
+          });
+
           // Parse and add to totals
           const grossWtNum = parseFloat(container.grossWt) || 0;
           const netWtNum = parseFloat(container.netWt) || 0;
           totalGrossWt += grossWtNum;
           totalNetWt += netWtNum;
-          
-          const grossWt = container.grossWt ? `${container.grossWt} KGS` : 'N/A';
-          doc.text(grossWt, cell2CenterX, rowY + 8, { align: 'center' });
-          
-          const netWt = container.netWt ? `${container.netWt} KGS` : 'N/A';
-          doc.text(netWt, cell3CenterX, rowY + 8, { align: 'center' });
-          
-          doc.text(container.sealNumber || 'N/A', cell4CenterX, rowY + 8, { align: 'center' });
-          
+
+          const grossWt = container.grossWt
+            ? `${container.grossWt} KGS`
+            : "N/A";
+          doc.text(grossWt, cell2CenterX, rowY + 8, { align: "center" });
+
+          const netWt = container.netWt ? `${container.netWt} KGS` : "N/A";
+          doc.text(netWt, cell3CenterX, rowY + 8, { align: "center" });
+
+          doc.text(container.sealNumber || "N/A", cell4CenterX, rowY + 8, {
+            align: "center",
+          });
+
           containerY += 12;
         });
-        
+
         // Add TOTAL row at the bottom
         const totalRowY = containerY;
-        
+
         // Draw total row borders
         doc.rect(tableX, totalRowY, tableWidth, 12);
-        
+
         // Draw vertical lines for total row
-        doc.line(tableX + col1Width, totalRowY, tableX + col1Width, totalRowY + 12);
-        doc.line(tableX + col1Width + col2Width, totalRowY, tableX + col1Width + col2Width, totalRowY + 12);
-        doc.line(tableX + col1Width + col2Width + col3Width, totalRowY, tableX + col1Width + col2Width + col3Width, totalRowY + 12);
-        
-       doc.setFont('arial', 'bold');
-         doc.text(`TOTAL: ${containersToShow.length} CONTAINERS`, cell1CenterX, totalRowY + 8, { align: 'center' });
-         doc.text(`${totalGrossWt.toFixed(2)} KGS`, cell2CenterX, totalRowY + 8, { align: 'center' });
-         doc.text(`${totalNetWt.toFixed(2)} KGS`, cell3CenterX, totalRowY + 8, { align: 'center' });
-         // Leave seal no total field empty as requested
-         doc.text('', tableX + col1Width + col2Width + col3Width + 2, totalRowY + 8);
-        
+        doc.line(
+          tableX + col1Width,
+          totalRowY,
+          tableX + col1Width,
+          totalRowY + 12
+        );
+        doc.line(
+          tableX + col1Width + col2Width,
+          totalRowY,
+          tableX + col1Width + col2Width,
+          totalRowY + 12
+        );
+        doc.line(
+          tableX + col1Width + col2Width + col3Width,
+          totalRowY,
+          tableX + col1Width + col2Width + col3Width,
+          totalRowY + 12
+        );
+
+        doc.setFont("arial", "bold");
+        doc.text(
+          `TOTAL: ${containersToShow.length} CONTAINERS`,
+          cell1CenterX,
+          totalRowY + 8,
+          { align: "center" }
+        );
+        doc.text(
+          `${totalGrossWt.toFixed(2)} KGS`,
+          cell2CenterX,
+          totalRowY + 8,
+          { align: "center" }
+        );
+        doc.text(`${totalNetWt.toFixed(2)} KGS`, cell3CenterX, totalRowY + 8, {
+          align: "center",
+        });
+        // Leave seal no total field empty as requested
+        doc.text(
+          "",
+          tableX + col1Width + col2Width + col3Width + 2,
+          totalRowY + 8
+        );
+
         containerY += 12; // Update containerY after total row
       }
     }
-    
+
     // Container weights are shown individually with each container, no need for overall weights
 
     // Reset to first page for remaining content (only if we moved to a new page for containers)
@@ -930,30 +1197,55 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // doc.text('SEAL NO: 014436', 70, firstRowTextY + 7);
     // doc.text('GROSS WT. 20,030.00 KGS', 70, firstRowTextY + 11);
 
-    // Dynamic container count logic with better positioning and formatting
-    const containerCount = Math.max(containers.length, blFormData?.containers?.length || 0);
-    const containerText = `${containerCount.toString().padStart(2, '0')}X20 ISO TANK SAID TO CONTAINS`;
-    
+    // --- Dynamic container count logic with better positioning and formatting ---
+    const selectedFromForm = (
+      Array.isArray(blFormData?.containers) ? blFormData.containers : []
+    )
+      .map((c: any) => c?.containerNumber)
+      .filter(Boolean);
+
+    const allFromShipment = (
+      Array.isArray(shipment?.containers) ? shipment.containers : []
+    )
+      .map((c: any) => c?.containerNumber)
+      .filter(Boolean);
+
+    const containersForHeader =
+      selectedFromForm.length > 0 ? selectedFromForm : allFromShipment;
+    const containerText = `${containersForHeader.length
+      .toString()
+      .padStart(2, "0")}X20 ISO TANK SAID TO CONTAINS`;
+
     // Set consistent font for this section
-    doc.setFont('arial', 'normal');
+    doc.setFont("arial", "normal");
     doc.setFontSize(10);
     doc.text(containerText, marginX + 110, firstRowTextY + 6);
-    
+
+    // Set consistent font for this section
+    doc.setFont("arial", "normal");
+    doc.setFontSize(10);
+    doc.text(containerText, marginX + 110, firstRowTextY + 6);
+
     // Use BL Details if provided, with dynamic text fitting
     const descriptionMaxY = firstRowTextY + 45; // Maximum Y position for description content
     const descriptionMaxWidth = 78;
     let currentDescriptionY = firstRowTextY + 12;
-    
+
     if (blDetails.trim()) {
       // Display the BL details field content with constrained height
-      const blDetailsLines = doc.splitTextToSize(blDetails, descriptionMaxWidth);
-      doc.setFont('arial', 'normal');
+      const blDetailsLines = doc.splitTextToSize(
+        blDetails,
+        descriptionMaxWidth
+      );
+      doc.setFont("arial", "normal");
       doc.setFontSize(10);
-      
+
       // Limit the number of lines to prevent overflow
-      const maxDescriptionLines = Math.floor((descriptionMaxY - currentDescriptionY) / 4);
+      const maxDescriptionLines = Math.floor(
+        (descriptionMaxY - currentDescriptionY) / 4
+      );
       const displayedLines = blDetailsLines.slice(0, maxDescriptionLines);
-      
+
       displayedLines.forEach((line: string) => {
         if (currentDescriptionY < descriptionMaxY) {
           doc.text(line, marginX + 110, currentDescriptionY);
@@ -961,67 +1253,76 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
         }
       });
     }
-    
+
     // Get freight payable option and related port info
-    const freightPayableAt = blFormData?.freightPayableAt || '';
-    const freightText = freightPayableAt === 'prepaid' ? '"FREIGHT PREPAID"' : 
-                       freightPayableAt === 'postpaid' ? '"FREIGHT POSTPAID"' : '"FREIGHT PREPAID"';
-    
+    const freightPayableAt = blFormData?.freightPayableAt || "";
+    const freightText =
+      freightPayableAt === "prepaid"
+        ? '"FREIGHT PREPAID"'
+        : freightPayableAt === "postpaid"
+        ? '"FREIGHT POSTPAID"'
+        : '"FREIGHT PREPAID"';
+
     // Get free days and detention rate from shipment data - Use only POD (destination port) values
-    const freeDays = shipment?.podFreeDays || '';
-    const detentionRate = shipment?.podDetentionRate || '';
-    
+    const freeDays = shipment?.podFreeDays || "";
+    const detentionRate = shipment?.podDetentionRate || "";
+
     // Additional block under description - improved spacing and alignment
     let addY = firstRowTextY + 50;
-    doc.setFont('arial', 'normal');
+    doc.setFont("arial", "normal");
     doc.setFontSize(9);
     doc.text(freightText, marginX + 110, addY);
     addY += 8;
-    
+
     // Dynamic free days text
-    const freeDaysText = freeDays ? `FREE ${freeDays} DAYS AT DESTINATION PORT THERE AFTER AT` : '';
+    const freeDaysText = freeDays
+      ? `FREE ${freeDays} DAYS AT DESTINATION PORT THERE AFTER AT`
+      : "";
     if (freeDaysText) {
       doc.text(freeDaysText, marginX + 110, addY);
       addY += 5;
     }
-    
+
     // Dynamic detention rate text
-    const detentionText = detentionRate ? `USD ${detentionRate} /DAY/TANK` : '';
+    const detentionText = detentionRate ? `USD ${detentionRate} /DAY/TANK` : "";
     if (detentionText) {
       doc.text(detentionText, marginX + 110, addY);
       addY += 8;
     }
 
     // Charge lines with better formatting - Use single charges field or default format
-    doc.setFont('arial', 'bold');
+    doc.setFont("arial", "bold");
     doc.setFontSize(8);
-    
+
     let chargeLines: string[] = [];
-    
+
     if (blFormData?.chargesAndFees && blFormData.chargesAndFees.trim()) {
       // If chargesAndFees field has content, use it directly
       chargeLines = [
         "SHIPPING LINE /SHIPPING LINE AGENTS ARE ELIGIBLE UNDER THIS B/L TERMS, TO",
-        "COLLECT CHARGES SUCH AS"
+
+        "COLLECT CHARGES SUCH AS",
       ];
-      
+
       // Split chargesAndFees by line breaks and add each line separately
-      const chargesLines = blFormData.chargesAndFees.split('\n').filter((line: string) => line.trim());
+      const chargesLines = blFormData.chargesAndFees
+        .split("\n")
+        .filter((line: string) => line.trim());
       chargeLines.push(...chargesLines);
     } else {
       // If empty, don't show any charges (as requested)
       chargeLines = [];
     }
-    
+
     chargeLines.forEach((t: string) => {
       const normalized = normalizePdfText(t);
       // Ensure character spacing is reset to prevent spacing artifacts
-      if ((doc as any).setCharSpace) { 
-        (doc as any).setCharSpace(0); 
+      if ((doc as any).setCharSpace) {
+        (doc as any).setCharSpace(0);
       }
-      
+
       // For charges and fees, render each line directly without wrapping to preserve line breaks
-      if (t.includes('SHIPPING LINE') || t.includes('COLLECT CHARGES')) {
+      if (t.includes("SHIPPING LINE") || t.includes("COLLECT CHARGES")) {
         // These are the header lines, render them as is
         doc.text(normalized, marginX + 110, addY);
         addY += 3.5;
@@ -1030,6 +1331,7 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
         doc.text(normalized, marginX + 110, addY);
         addY += 3.5;
       }
+
     });
 
     rowEndY = Math.max(rowEndY, addY);
@@ -1052,11 +1354,12 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     }
     // Reduced height to free more space for the terms section below
     const bottomBoxHeight = 48; // Reduced from 52 to 48
-    
+
+
     // Calculate terms section positioning early for border calculations
     const termsBoxTop = bottomBoxTop + bottomBoxHeight;
     const termsBoxHeight = 50; // Increased height to accommodate all terms text content
-    
+
     // Update bottom border position based on container count and fixed terms section height
     if (actualContainerCount === 1) {
       bottomBorderY = termsBoxTop + termsBoxHeight - 3; // Move up for single container to reduce empty space
@@ -1065,18 +1368,24 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     } else {
       bottomBorderY = termsBoxTop + termsBoxHeight - 6; // Move up 5mm for three containers to reduce empty space
     }
-  
+
+
     // Now draw the bottom border at the correct position
     doc.line(marginX, bottomBorderY, marginX + contentWidth, bottomBorderY); // bottom
-    
+
     // Update left and right borders to match the new bottom position
     leftBorderY = bottomBorderY;
     rightBorderY = bottomBorderY;
-    
+
     // Now draw the left and right vertical borders at the correct position
     doc.line(marginX, marginY, marginX, leftBorderY); // left
-    doc.line(marginX + contentWidth, marginY, marginX + contentWidth, rightBorderY); // right
-    
+    doc.line(
+      marginX + contentWidth,
+      marginY,
+      marginX + contentWidth,
+      rightBorderY
+    ); // right
+
     doc.setLineWidth(0.5);
     // Draw bottom box without bottom edge so there is only one line between this box and the terms box below
     // left vertical
@@ -1084,12 +1393,17 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // top horizontal
     doc.line(marginX, bottomBoxTop, marginX + headerWidth, bottomBoxTop);
     // right vertical
-    doc.line(marginX + headerWidth, bottomBoxTop, marginX + headerWidth, bottomBoxTop + bottomBoxHeight);
+    doc.line(
+      marginX + headerWidth,
+      bottomBoxTop,
+      marginX + headerWidth,
+      bottomBoxTop + bottomBoxHeight
+    );
 
     // Four-column layout with better proportions: Delivery Agent | Freight Payable At/Amount | Number of original & Place/date
-    const colDA_X = marginX;                                    // left start
-    const colFA_X = marginX + (75 / 190) * headerWidth;        // Freight section start  
-    const colNUM_X = marginX + (125 / 190) * headerWidth;      // Number of original / Place/date start
+    const colDA_X = marginX; // left start
+    const colFA_X = marginX + (75 / 190) * headerWidth; // Freight section start
+    const colNUM_X = marginX + (125 / 190) * headerWidth; // Number of original / Place/date start
     const colRightEnd = marginX + headerWidth;
 
     // Draw vertical separators confined to their respective sections
@@ -1097,46 +1411,58 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     doc.line(colNUM_X, bottomBoxTop, colNUM_X, bottomBoxTop + bottomBoxHeight);
 
     // Bottom box headers with better spacing
-    doc.setFont('arial', 'bold');
+    doc.setFont("arial", "bold");
     doc.setFontSize(11);
     const rightSectionPaddingLeft = 2;
     const rightSectionPaddingRight = 2;
     const rightColX = colNUM_X + rightSectionPaddingLeft;
     const rightSectionRight = colRightEnd - rightSectionPaddingRight; // keep a small inset from border
-    doc.text('Delivery Agent', marginX + 5, bottomBoxTop + 8);
-    doc.text('Freight payable at', colFA_X + 5, bottomBoxTop + 8);
-    
+    doc.text("Delivery Agent", marginX + 5, bottomBoxTop + 8);
+    doc.text("Freight payable at", colFA_X + 5, bottomBoxTop + 8);
+
     // Add horizontal separator in freight section for "Freight Amount"
     // doc.line(colFA_X, bottomBoxTop + 18, colNUM_X, bottomBoxTop + 18);
     // doc.text('Freight Amount', colFA_X + 5, bottomBoxTop + 26);
-    
+
     // Right section headers - improved alignment and slight extra separation
-    doc.text('Number of original BL/MTD(s)', rightColX, bottomBoxTop + 8);
-    doc.text('Date of issue', rightSectionRight, bottomBoxTop + 8, { align: 'right' });
+    doc.text("Number of original BL/MTD(s)", rightColX, bottomBoxTop + 8);
+    doc.text("Date of issue", rightSectionRight, bottomBoxTop + 8, {
+      align: "right",
+    });
 
     // Bottom box values with proper spacing and alignment
-    doc.setFont('arial', 'bold');
+    doc.setFont("arial", "bold");
     doc.setFontSize(10);
-    
+
     // Delivery Agent section - Ultra compact to save space for terms
     let deliveryAgentY = bottomBoxTop + 12; // Reduced from 14
     const deliveryAgentMaxY = bottomBoxTop + bottomBoxHeight - 2; // Reduced margin
     const deliveryAgentMaxWidth = colFA_X - marginX - 4; // Reduced padding
-    
+
     // Use very compact spacing for all fields
     const compactLineSpacing = 4; // Reduced from 4-5
-    
+
     // Use combined delivery agent info if available, otherwise fall back to individual fields
     if (deliveryAgent?.combinedInfo && deliveryAgent.combinedInfo.trim()) {
       // Use combined field like charges and fees
-      doc.setFont('arial', 'normal');
+      doc.setFont("arial", "normal");
       doc.setFontSize(10);
-      const combinedLines = doc.splitTextToSize(deliveryAgent.combinedInfo, deliveryAgentMaxWidth);
-      
+      const combinedLines = doc.splitTextToSize(
+        deliveryAgent.combinedInfo,
+        deliveryAgentMaxWidth
+      );
+
       // Display as many lines as fit in the available space
       combinedLines.forEach((line: string, index: number) => {
-        if (deliveryAgentY + (index * compactLineSpacing) < deliveryAgentMaxY - 2) {
-          doc.text(line, marginX + 5, deliveryAgentY + 2 + (index * compactLineSpacing));
+        if (
+          deliveryAgentY + index * compactLineSpacing <
+          deliveryAgentMaxY - 2
+        ) {
+          doc.text(
+            line,
+            marginX + 5,
+            deliveryAgentY + 2 + index * compactLineSpacing
+          );
         }
       });
       deliveryAgentY += combinedLines.length * compactLineSpacing;
@@ -1144,74 +1470,91 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       // Fallback to individual fields if combined field is empty
       // Delivery Agent Name - Bold (single line only)
       if (deliveryAgent?.name && deliveryAgentY < deliveryAgentMaxY - 10) {
-        doc.setFont('arial', 'bold');
+        doc.setFont("arial", "bold");
         doc.setFontSize(10);
-        const nameLines = doc.splitTextToSize(deliveryAgent.name, deliveryAgentMaxWidth);
+        const nameLines = doc.splitTextToSize(
+          deliveryAgent.name,
+          deliveryAgentMaxWidth
+        );
         doc.text(nameLines[0], marginX + 5, deliveryAgentY + 2);
         deliveryAgentY += compactLineSpacing;
       }
-      
+
       // Delivery Agent Address - Normal (single line only)
       if (deliveryAgent?.address && deliveryAgentY < deliveryAgentMaxY - 6) {
-        doc.setFont('arial', 'normal');
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const agentAddressLines = doc.splitTextToSize(deliveryAgent.address, deliveryAgentMaxWidth);
+        const agentAddressLines = doc.splitTextToSize(
+          deliveryAgent.address,
+          deliveryAgentMaxWidth
+        );
         doc.text(agentAddressLines[0], marginX + 5, deliveryAgentY + 2);
         deliveryAgentY += compactLineSpacing;
       }
-      
+
       // Delivery Agent Contact - Normal (single line only)
       if (deliveryAgent?.contactNo && deliveryAgentY < deliveryAgentMaxY - 3) {
-        doc.setFont('arial', 'normal');
+        doc.setFont("arial", "normal");
         doc.setFontSize(10);
-        const telLines = doc.splitTextToSize(`TEL: ${deliveryAgent.contactNo}`, deliveryAgentMaxWidth);
+        const telLines = doc.splitTextToSize(
+          `TEL: ${deliveryAgent.contactNo}`,
+          deliveryAgentMaxWidth
+        );
         doc.text(telLines[0], marginX + 5, deliveryAgentY + 2);
-        deliveryAgentY += compactLineSpacing; 
+        deliveryAgentY += compactLineSpacing;
       }
-      
+
       // Delivery Agent Email - Normal (single line only)
       if (deliveryAgent?.email && deliveryAgentY < deliveryAgentMaxY) {
-        doc.setFont('arial', 'bold');
+
+        doc.setFont("arial", "bold");
         doc.setFontSize(10);
-        const emailLines = doc.splitTextToSize(`EMAIL: ${deliveryAgent.email}`, deliveryAgentMaxWidth);
+        const emailLines = doc.splitTextToSize(
+          `EMAIL: ${deliveryAgent.email}`,
+          deliveryAgentMaxWidth
+        );
         doc.text(emailLines[0], marginX + 5, deliveryAgentY + 2);
         deliveryAgentY += compactLineSpacing;
       }
     }
-    
+
     // VAT field is now included in the combined delivery agent info field above, so no separate VAT display needed
-    
+
     // Dynamic port selection based on freight payable option
-    let freightPayablePort = 'Nhava Sheva'; // default
-    if (freightPayableAt === 'prepaid') {
-      freightPayablePort = polName || 'Nhava Sheva'; // Port of Loading
-    } else if (freightPayableAt === 'postpaid') {
-      freightPayablePort = podName || 'Nhava Sheva'; // Port of Discharge
+    let freightPayablePort = "Nhava Sheva"; // default
+    if (freightPayableAt === "prepaid") {
+      freightPayablePort = polName || "Nhava Sheva"; // Port of Loading
+    } else if (freightPayableAt === "postpaid") {
+      freightPayablePort = podName || "Nhava Sheva"; // Port of Discharge
     }
-    
+
     // Freight section with exchanged positions - freightPayablePort at top, freight amount at bottom
     doc.text(freightPayablePort, colFA_X + 5, bottomBoxTop + 16);
     // Show freight amount in bottom position (currently commented as per previous request)
     // doc.text(freightAmount || '2000', colFA_X + 5, bottomBoxTop + 34);
-    
+
     // Right section - Number of originals and place/date
     // For original BLs (all copies), show 3(THREE) as requested
-    let copyNumberText = '3(THREE)';
-    if (blType === 'original') {
-      copyNumberText = '3(THREE)'; // Show 3(THREE) for all original BL copies
+    let copyNumberText = "3(THREE)";
+    if (blType === "original") {
+      copyNumberText = "3(THREE)"; // Show 3(THREE) for all original BL copies
     } else {
       // For draft and seaway BLs, use the copy number
-      const copyNumberTexts = ['0(ZERO)', '1(ONE)', '2(TWO)'];
-      copyNumberText = copyNumberTexts[copyNumber] || '0(ZERO)';
+      const copyNumberTexts = ["0(ZERO)", "1(ONE)", "2(TWO)"];
+      copyNumberText = copyNumberTexts[copyNumber] || "0(ZERO)";
     }
-    doc.text(`${copyNumberText} ${freightPayablePort}`, rightColX, bottomBoxTop + 16);
+    doc.text(
+      `${copyNumberText} ${freightPayablePort}`,
+      rightColX,
+      bottomBoxTop + 16
+    );
     // Horizontal rule just below the copy number/place text within the rightmost section
     doc.line(colNUM_X, bottomBoxTop + 18, colRightEnd, bottomBoxTop + 18);
-    
+
     // Place and date of issue - right aligned with extra padding from border
-    doc.text(blDate, rightSectionRight, bottomBoxTop + 16, { align: 'right' });
-    doc.text('For RISTAR LOGISTICS PVT LTD', rightColX, bottomBoxTop + 28);
-    
+    doc.text(blDate, rightSectionRight, bottomBoxTop + 16, { align: "right" });
+    doc.text("For RISTAR LOGISTICS PVT LTD", rightColX, bottomBoxTop + 28);
+
     // Dynamic positioning for "As Agent for the Carrier" based on container count
     // Move it down much closer to the bottom line for all container counts
     let asAgentY = bottomBoxTop + 40; // Base position
@@ -1225,9 +1568,10 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
       // For 3-container PDFs, move it down for better balance
       asAgentY = bottomBoxTop + 80; // Move down 40mm more than base position
     }
-    
+
+
     // Add "As Agent for the Carrier" with dynamic positioning
-    doc.text('As Agent for the Carrier', rightColX, asAgentY);
+    doc.text("As Agent for the Carrier", rightColX, asAgentY);
 
     // Terms block moved below the bottom grid (new section)
     // Using fixed terms box height calculated earlier
@@ -1236,38 +1580,37 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
     // Extend the middle vertical separator to match the bottom border position
     doc.line(colNUM_X, termsBoxTop, colNUM_X, bottomBorderY);
     // Remove left and right vertical borders of terms box as requested
-  // Omit bottom edge of terms box so only the outer page border shows at the end
-  // Reduce top padding so the first line starts higher (closer to the separator line)
-  // Add some spacing from the top separator before the terms text begins
-  const miniTermsY = termsBoxTop + 4; // Reduced padding from 6 to 4
-  doc.setFont('arial', 'bold'); // Set font to bold for terms text
-  doc.setFontSize(7); // Further reduced from 7 to 6 for better fit inside the section
-  const miniTerms = [
-      'By accepting this Bill of lading shipper accepts and abides by all terms, conditions clauses printed and stamped on the face or reverse side of this bill of lading.',
-      'By accepting this Bill of lading, the shipper accepts his responsibility towards the carrier for payment of freight (in case of freight collect shipments), Accrued',
-      'Government, reshipment or disposal costs (as the case may be) if the consignee fails to take delivery of the cargo within 90 days from the date of cargo reaches destination.',
-      'For freight prepaid Bill of Ladings, delivery of Cargo is subject to realisation of freight cheque. Demurrage/Detention charges at port of destination payable by consignee as per',
+    // Omit bottom edge of terms box so only the outer page border shows at the end
+    // Reduce top padding so the first line starts higher (closer to the separator line)
+    // Add some spacing from the top separator before the terms text begins
+    const miniTermsY = termsBoxTop + 4; // Reduced padding from 6 to 4
+    doc.setFont("arial", "bold"); // Set font to bold for terms text
+    doc.setFontSize(7); // Further reduced from 7 to 6 for better fit inside the section
+    const miniTerms = [
+      "By accepting this Bill of lading shipper accepts and abides by all terms, conditions clauses printed and stamped on the face or reverse side of this bill of lading.",
+      "By accepting this Bill of lading, the shipper accepts his responsibility towards the carrier for payment of freight (in case of freight collect shipments), Accrued",
+      "Government, reshipment or disposal costs (as the case may be) if the consignee fails to take delivery of the cargo within 90 days from the date of cargo reaches destination.",
+      "For freight prepaid Bill of Ladings, delivery of Cargo is subject to realisation of freight cheque. Demurrage/Detention charges at port of destination payable by consignee as per",
       "line's tariff.",
-      'The carrier reserves the right to repack the goods if the same are not in seaworthy packing.The packing condition will be certified by the local bonded',
-      'warehouse of competent surveyor , and the shipper by virtue of accepting this bill of lading accepts the liability towards the cost for the same.',
-      'For shipments where inland trucking is involved it is mandatory on consignee to custom clear the shipment at port of discharge.',
-      'In case of any discrepancy found in declared weight & volume the carrier reserve the right to hold the shipment & recover all charges as per the revised weight & volume whichever is high from shipper or consignee.'
-      
+      "The carrier reserves the right to repack the goods if the same are not in seaworthy packing.The packing condition will be certified by the local bonded",
+      "warehouse of competent surveyor , and the shipper by virtue of accepting this bill of lading accepts the liability towards the cost for the same.",
+      "For shipments where inland trucking is involved it is mandatory on consignee to custom clear the shipment at port of discharge.",
+      "In case of any discrepancy found in declared weight & volume the carrier reserve the right to hold the shipment & recover all charges as per the revised weight & volume whichever is high from shipper or consignee.",
     ];
-    let mtY = miniTermsY; 
-  // Constrain terms text to the left of the new vertical separator
-  const miniTermsMaxWidth = Math.max(40, (colNUM_X - (marginX + 9))); 
-  
-  // Fixed height for terms text to match the fixed section height
-  const availableHeight = 50; // Fixed height that fits within the 50mm section height
-  const maxBottomY = termsBoxTop + availableHeight;
-  
-  miniTerms.forEach((t) => {
+    let mtY = miniTermsY;
+    // Constrain terms text to the left of the new vertical separator
+    const miniTermsMaxWidth = Math.max(40, colNUM_X - (marginX + 9));
+
+    // Fixed height for terms text to match the fixed section height
+    const availableHeight = 50; // Fixed height that fits within the 50mm section height
+    const maxBottomY = termsBoxTop + availableHeight;
+
+    miniTerms.forEach((t) => {
       // Check if we have space for more text
       if (mtY >= maxBottomY) return; // Stop adding text if we've reached the limit
-      
+
       const wrapped = doc.splitTextToSize(t, miniTermsMaxWidth);
-      
+
       // Check if this text block will fit
       const textBlockHeight = wrapped.length * 2.5 + 0.5;
       if (mtY + textBlockHeight <= maxBottomY) {
@@ -1280,36 +1623,39 @@ doc.text(shipment.vesselName || '', pLeftX, portsTop + rowH * 3 + 10);
 
     // Save the PDF with dynamic port names from shipment data
     let fileName = "";
-    const copySuffix = copyNumber === 0 ? '' : copyNumber === 1 ? '_2nd_Copy' : '_3rd_Copy';
-    
+    const copySuffix =
+      copyNumber === 0 ? "" : copyNumber === 1 ? "_2nd_Copy" : "_3rd_Copy";
+
     // Get port codes from shipment data for dynamic filename
-    const polPortCode = shipment.polPort?.portCode || 'NSA';
-    const podPortCode = shipment.podPort?.portCode || 'JEV';
-    
+    const polPortCode = shipment.polPort?.portCode || "NSA";
+    const podPortCode = shipment.podPort?.portCode || "JEV";
+
     // Use the actual port codes (3-letter abbreviations) for filename
     const polCode = polPortCode.substring(0, 3).toUpperCase();
     const podCode = podPortCode.substring(0, 3).toUpperCase();
-    
+
     // Create filename with POL first, then POD (matching the actual shipment route)
     const portCode = `${polCode}${podCode}`;
-    
+
     switch (blType) {
-      case 'original':
+      case "original":
         fileName = `RST_${portCode}_25_00001_Original_BL${copySuffix}.pdf`;
         break;
-      case 'draft':
+      case "draft":
         fileName = `RST_${portCode}_25_00001_Draft_BL${copySuffix}.pdf`;
         break;
-      case 'seaway':
+      case "seaway":
         fileName = `RST_${portCode}_25_00001_Seaway_BL${copySuffix}.pdf`;
         break;
     }
 
     // Add page numbers to all pages as "Page X of Y"
-    const totalPages = (doc as any).getNumberOfPages ? (doc as any).getNumberOfPages() : 1;
+    const totalPages = (doc as any).getNumberOfPages
+      ? (doc as any).getNumberOfPages()
+      : 1;
     for (let p = 1; p <= totalPages; p++) {
       doc.setPage(p);
-      doc.setFont('arial', 'normal');
+      doc.setFont("arial", "normal");
       doc.setFontSize(10);
       const pageNumberText = `Page ${p} of ${totalPages}`;
       // Keep position consistent with prior single "Page 2" placement

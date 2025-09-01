@@ -42,77 +42,14 @@ import { generateCroPdf } from './generateCroPdf';
 import { generateBlPdf, type BLType, type BLFormData } from './generateBlPdf';
 import { apiFetch } from '../../../lib/api';
 
-// Extended BL form data interface to include all form fields
-interface ExtendedBLFormData extends BLFormData {
-  shippersName: string;
-  shippersAddress: string;
-  shippersContactNo: string;
-  shippersEmail: string;
-  shipperInfo: string; // Combined field
-  consigneeName: string;
-  consigneeAddress: string;
-  consigneeContactNo: string;
-  consigneeEmail: string;
-  consigneeInfo: string; // Combined field
-  notifyPartyName: string;
-  notifyPartyAddress: string;
-  notifyPartyContactNo: string;
-  notifyPartyEmail: string;
-  notifyPartyInfo: string; // Combined field
-  deliveryAgentName: string;
-  deliveryAgentAddress: string;
-  deliveryAgentContactNo: string;
-  deliveryAgentEmail: string;
-  deliveryAgentInfo: string; // Combined field
-  sealNo: string;
-  grossWt: string;
-  netWt: string;
-  billofLadingDetails: string;
-  freightPayableAt: string;
-  freightAmount: string;
-  Vat: string;
-  chargesAndFees: string;
-  shipmentId: number;
-  blType: BLType;
-}
-
-// Complete BL form data interface for API calls
-interface CompleteBLFormData {
-  shipmentId?: number;
-  shippersName: string;
-  shippersAddress: string;
-  shippersContactNo: string;
-  shippersEmail: string;
-  shipperInfo: string;
-  consigneeName: string;
-  consigneeAddress: string;
-  consigneeContactNo: string;
-  consigneeEmail: string;
-  consigneeInfo: string;
-  notifyPartyName: string;
-  notifyPartyAddress: string;
-  notifyPartyContactNo: string;
-  notifyPartyEmail: string;
-  notifyPartyInfo: string;
-  deliveryAgentName: string;
-  deliveryAgentAddress: string;
-  deliveryAgentContactNo: string;
-  deliveryAgentEmail: string;
-  deliveryAgentInfo: string;
-  sealNo: string;
-  grossWt: string;
-  netWt: string;
-  billofLadingDetails: string;
-  freightPayableAt: string;
-  freightAmount: string;
-  Vat: string;
-  chargesAndFees: string;
-}
 
 interface Shipment {
   id: number;
   [key: string]: any;
 }
+
+
+
 
 const AllShipmentsPage = () => {
 
@@ -121,6 +58,8 @@ const AllShipmentsPage = () => {
   const [viewShipment, setViewShipment] = useState<any>(null);
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [containerSearch, setContainerSearch] = useState('');
+  const [blGroups, setBlGroups] = useState<string[][]>([]);
+
 
   // Add state for selected containers
   const [selectedContainers, setSelectedContainers] = useState<any[]>([]);
@@ -151,9 +90,9 @@ const AllShipmentsPage = () => {
   const [showBlModal, setShowBlModal] = useState(false);
   const [currentBlType, setCurrentBlType] = useState<BLType>('original');
   const [blJustSaved, setBlJustSaved] = useState(false);
-  const [blGenerationStatus, setBlGenerationStatus] = useState<{[key: number]: {hasDraftBlGenerated: boolean, hasOriginalBLGenerated: boolean, firstGenerationDate: string | null}}>({});
-  const [croGenerationStatus, setCroGenerationStatus] = useState<{[key: number]: {hasCroGenerated: boolean, firstCroGenerationDate: string | null}}>({});
-  
+  const [blGenerationStatus, setBlGenerationStatus] = useState<{ [key: number]: { hasDraftBlGenerated: boolean, hasOriginalBLGenerated: boolean, firstGenerationDate: string | null } }>({});
+  const [croGenerationStatus, setCroGenerationStatus] = useState<{ [key: number]: { hasCroGenerated: boolean, firstCroGenerationDate: string | null } }>({});
+
   // Add state to track copy downloads for each shipment and BL type
   const [blCopyDownloadStatus, setBlCopyDownloadStatus] = useState<{
     [shipmentId: number]: {
@@ -201,7 +140,7 @@ const AllShipmentsPage = () => {
     portOfDischarge: '',
     vesselNo: '',
     // Container-specific fields
-    containers: [] as Array<{containerNumber: string, sealNumber: string, grossWt: string, netWt: string}>,
+    containers: [] as Array<{ containerNumber: string, sealNumber: string, grossWt: string, netWt: string }>,
     // Additional fields for form management
     shipmentId: 0,
     blType: 'original' as BLType,
@@ -290,15 +229,182 @@ const AllShipmentsPage = () => {
 
     // Vessel
     vesselName: '',
-    
+
     // Tank preparation
     tankPreparation: '',
   });
 
+  // === MULTI BL: state & helpers ===
+  type BLType = 'draft' | 'original' | 'seaway';
+
+  // how many BLs to create (e.g., 4)
+  const [blCount, setBlCount] = React.useState<number>(1);
+
+
+
+
+
+  // has the “groups” UI been initialized?
+  const [multiBlStageReady, setMultiBlStageReady] = React.useState(false);
+  const downloadBlockedByAssign = multiBlStageReady && blGroups.length > 1;
+
+  function AssignedBlDownloads({
+    shipmentId,
+    blType,
+    label,
+    onClickDownload,
+  }: {
+    shipmentId: number;
+    blType: BLType;
+    label: string;
+    onClickDownload: (index: number) => void;
+  }) {
+    const [groups, setGroups] = React.useState<string[][]>([]);
+    React.useEffect(() => {
+      let mounted = true;
+      fetchBlAssignments(shipmentId, blType).then((g) => {
+        if (mounted) setGroups(g);
+      });
+      return () => { mounted = false; };
+    }, [shipmentId, blType]);
+
+    if (!groups?.length) return null;
+    const ord = (n: number) => (n === 1 ? '1st' : n === 2 ? '2nd' : n === 3 ? '3rd' : `${n}th`);
+
+    return (
+      <>
+        <div className="px-3 py-1 text-xs text-gray-500">
+          Assigned {groups.length} BL(s) – {label}
+        </div>
+        {groups.map((_, idx) => (
+          <DropdownMenuItem
+            key={`${blType}-split-${idx}`}
+            className="cursor-pointer text-blue-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClickDownload(idx);
+            }}
+          >
+            Download {ord(idx + 1)} BL ({label})
+          </DropdownMenuItem>
+        ))}
+      </>
+    );
+  }
+
+
+
+  /** GET persisted container groups for a shipment + BL type */
+  const fetchBlAssignments = async (
+    shipmentId: number,
+    blType: BLType
+  ): Promise<string[][]> => {
+    try {
+      // apiFetch returns parsed JSON directly (not { data })
+      const data = await apiFetch(
+        `http://localhost:8000/shipment/assignments/${shipmentId}/${blType}`,
+        { method: 'GET' }
+      );
+      return Array.isArray((data as any)?.groups) ? (data as any).groups : [];
+    } catch {
+      return [];
+    }
+  };
+
+
+  /** PUT (create/replace) groups for a shipment + BL type */
+  const saveBlAssignments = async (
+    shipmentId: number,
+    blType: BLType,
+    groups: string[][]
+  ) => {
+    // apiFetch auto-JSONs plain objects, adds auth headers, and throws on non-2xx
+    await apiFetch(
+      `http://localhost:8000/shipment/assignments/${shipmentId}/${blType}`,
+      {
+        method: 'PUT',
+        body: { groups },
+      }
+    );
+  };
+
+  // read all container numbers visible in this form (deduped)
+  const getAllContainersFromForm = (): string[] => {
+    const fromArray = (blFormData?.containers || [])
+      .map((c: any) => c?.containerNumber)
+      .filter(Boolean);
+    const fromString = (Array.isArray(blFormData?.containerNos)
+      ? blFormData.containerNos
+      : (blFormData?.containerNos || ''))
+      .toString()
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+    return Array.from(new Set([...fromArray, ...fromString]));
+  };
+
+  // init N groups; preserve any existing picks if count changes
+  const initBlGroups = (count: number) => {
+    setBlGroups(prev => {
+      const next = Array.from({ length: count }, (_, i) => (prev[i] ? [...prev[i]] : []));
+      return next.map(g => Array.from(new Set(g)));
+    });
+    setMultiBlStageReady(true);
+  };
+
+  // toggle container in a group and ensure container exists in only ONE group
+  const toggleContainerInGroup = (groupIdx: number, containerNumber: string) => {
+    setBlGroups(prev => {
+      const next = prev.map(g => g.filter(n => n !== containerNumber)); // remove from all groups
+      const alreadyIn = prev[groupIdx]?.includes(containerNumber);
+      if (!alreadyIn) next[groupIdx] = [...(next[groupIdx] || []), containerNumber];
+      return next;
+    });
+  };
+
+
+
+  // Load groups for the requested BL type; if none and not draft, fall back to draft
+  const hydrateAssignmentsForModal = async (shipmentId: number, blType: BLType) => {
+    try {
+      // Try the current BL type first
+      const savedGroups = await fetchBlAssignments(shipmentId, blType);
+      if (savedGroups.length > 0) {
+        setBlCount(savedGroups.length);
+        setBlGroups(savedGroups);
+        setMultiBlStageReady(true);
+        return;
+      }
+
+      // If nothing saved for this type, and we're NOT on draft, try to copy from draft
+      if (blType !== 'draft') {
+        const draftGroups = await fetchBlAssignments(shipmentId, 'draft');
+        if (draftGroups.length > 0) {
+          setBlCount(draftGroups.length);
+          setBlGroups(draftGroups);
+          setMultiBlStageReady(true);
+          return;
+        }
+      }
+
+      // Nothing to show
+      setBlCount(1);
+      setBlGroups([]);
+      setMultiBlStageReady(false);
+    } catch {
+      setBlCount(1);
+      setBlGroups([]);
+      setMultiBlStageReady(false);
+    }
+  };
+
+
+
+
   const fetchShipments = async () => {
     try {
       const res = await axios.get('http://localhost:8000/shipment');
-      
+
       // Enhanced sorting with better date handling and fallback to ID
       const sortedData = res.data.sort((a: any, b: any) => {
         // Try to get valid dates from multiple possible fields
@@ -331,43 +437,43 @@ const AllShipmentsPage = () => {
             const match = jobNumber.match(/\/(\d+)$/);
             return match ? parseInt(match[1]) : 0;
           };
-          
+
           const jobNumA = getJobNumber(a.jobNumber);
           const jobNumB = getJobNumber(b.jobNumber);
-          
+
           if (jobNumA !== jobNumB) {
             return jobNumB - jobNumA; // Descending order
           }
         }
-        
+
         // If job numbers are equal or don't exist, sort by ID (descending) as final fallback
         return (b.id || 0) - (a.id || 0);
       });
 
       // Debug: Log the raw data first, then sorted data
-      console.log('Raw shipments data:', res.data.map((s: any) => ({ 
-        id: s.id, 
-        date: s.date, 
+      console.log('Raw shipments data:', res.data.map((s: any) => ({
+        id: s.id,
+        date: s.date,
         jobNumber: s.jobNumber,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt
       })));
 
-      console.log('Sorted shipments:', sortedData.map((s: any) => ({ 
-        id: s.id, 
-        date: s.date, 
+      console.log('Sorted shipments:', sortedData.map((s: any) => ({
+        id: s.id,
+        date: s.date,
         jobNumber: s.jobNumber,
         formattedDate: new Date(s.date).toLocaleDateString()
       })));
 
       setShipments(sortedData);
-      
+
       // Load BL generation status for all shipments
       await fetchBlGenerationStatuses(sortedData);
-      
+
       // Load CRO generation status for all shipments
       await fetchCroGenerationStatuses(sortedData);
-      
+
       // Initialize copy download status for all shipments by checking database
       await initializeBlCopyDownloadStatus(sortedData);
     } catch (err) {
@@ -378,7 +484,7 @@ const AllShipmentsPage = () => {
   // Function to initialize BL copy download status - check database for existing BLs
   const initializeBlCopyDownloadStatus = async (shipments: any[]) => {
     const initialStatus: typeof blCopyDownloadStatus = {};
-    
+
     // Initialize with default values
     shipments.forEach((shipment) => {
       initialStatus[shipment.id] = {
@@ -407,7 +513,7 @@ const AllShipmentsPage = () => {
         if (response.data) {
           // Handle both array and single object responses
           const blRecords = Array.isArray(response.data) ? response.data : [response.data];
-          
+
           // Check each BL type for existing records
           blRecords.forEach((bl: any) => {
             if (bl.blType && initialStatus[shipment.id]) {
@@ -423,15 +529,15 @@ const AllShipmentsPage = () => {
         // Keep default false values for this shipment
       }
     }
-    
+
     setBlCopyDownloadStatus(initialStatus);
   };
 
   // Function to fetch BL generation statuses for all shipments
   const fetchBlGenerationStatuses = async (shipments: any[]) => {
     try {
-      const statusMap: {[key: number]: {hasDraftBlGenerated: boolean, hasOriginalBLGenerated: boolean, firstGenerationDate: string | null}} = {};
-      
+      const statusMap: { [key: number]: { hasDraftBlGenerated: boolean, hasOriginalBLGenerated: boolean, firstGenerationDate: string | null } } = {};
+
       // Fetch BL status for each shipment
       for (const shipment of shipments) {
         try {
@@ -458,7 +564,7 @@ const AllShipmentsPage = () => {
           };
         }
       }
-      
+
       setBlGenerationStatus(statusMap);
     } catch (error) {
       console.error('Failed to fetch BL generation statuses:', error);
@@ -468,8 +574,8 @@ const AllShipmentsPage = () => {
   // Function to fetch CRO generation statuses for all shipments
   const fetchCroGenerationStatuses = async (shipments: any[]) => {
     try {
-      const statusMap: {[key: number]: {hasCroGenerated: boolean, firstCroGenerationDate: string | null}} = {};
-      
+      const statusMap: { [key: number]: { hasCroGenerated: boolean, firstCroGenerationDate: string | null } } = {};
+
       // Set CRO status based on shipment data
       for (const shipment of shipments) {
         statusMap[shipment.id] = {
@@ -477,7 +583,7 @@ const AllShipmentsPage = () => {
           firstCroGenerationDate: shipment.firstCroGenerationDate || null
         };
       }
-      
+
       setCroGenerationStatus(statusMap);
     } catch (error) {
       console.error('Failed to fetch CRO generation statuses:', error);
@@ -562,7 +668,7 @@ const AllShipmentsPage = () => {
       // Fetch port names
       const portsRes = await fetch("http://localhost:8000/ports");
       const portsData = await portsRes.json();
-      
+
       if (shipment.polPortId) {
         const polPort = portsData.find((p: any) => p.id === shipment.polPortId);
         portOfLoadingName = polPort?.portName || '';
@@ -577,7 +683,7 @@ const AllShipmentsPage = () => {
       const existingContainers = shipment.containers?.map((container: any) => {
         // Find the port info from the fetched ports data
         const portInfo = portsData.find((port: any) => port.id === container.portId);
-        
+
         return {
           containerNumber: container.containerNumber,
           capacity: container.capacity,
@@ -623,7 +729,7 @@ const AllShipmentsPage = () => {
       carrierId: shipment.carrierAddressBookId?.toString() || '',
       carrierAddressBookId: shipment.carrierAddressBookId,
       carrierName: carrierName, // Set the actual name
-      
+
       // FIX: Ensure productId is passed as number, not string
       productId: shipment.productId || '', // Keep as number/empty string
       productName: productDisplayName, // Set the display name
@@ -670,16 +776,16 @@ const AllShipmentsPage = () => {
       sobDate: shipment.sob ? new Date(shipment.sob).toISOString().split('T')[0] : '',
       etaToPod: shipment.etaTopod ? new Date(shipment.etaTopod).toISOString().split('T')[0] : '',
       estimatedEmptyReturnDate: shipment.estimateDate ? new Date(shipment.estimateDate).toISOString().split('T')[0] : '',
-      
+
       // Additional fields for the useEffect - pass the raw date strings
       gsDate: shipment.gsDate,
       sob: shipment.sob,
       etaTopod: shipment.etaTopod,
       estimateDate: shipment.estimateDate,
-      
+
       // Vessel name
       vesselName: shipment.vesselName || '',
-      
+
       // Tank preparation field
       tankPreparation: shipment.tankPreparation || '',
     });
@@ -709,14 +815,14 @@ const AllShipmentsPage = () => {
       const [addressBooksRes] = await Promise.all([
         axios.get(`http://localhost:8000/addressbook`),
       ]);
-      
+
       const addressBooks = addressBooksRes.data;
-      
+
       // Get company information
       const shipper = addressBooks.find(
         (ab: any) => ab.id === shipment.shipperAddressBookId
       );
-      
+
       const primaryDepot = addressBooks.find(
         (ab: any) => ab.companyName === (shipment.containers?.[0]?.depotName || "Unknown Depot")
       ) || addressBooks.find(
@@ -759,20 +865,14 @@ const AllShipmentsPage = () => {
         })(),
         containers: shipment.containers || []
       });
-      
+
       setShowCroModal(true);
     } catch (error) {
       console.error('Error loading CRO data:', error);
     }
   };
 
-  // Handle saving CRO form data
-  const handleSaveCroData = () => {
-    // Here you can add logic to save the form data to database if needed
-    console.log('Saving CRO data:', croFormData);
-    // For now, just close the modal
-    setShowCroModal(false);
-  };
+
 
   // Handle editing shipment from CRO modal
   const handleEditShipmentFromCro = async () => {
@@ -795,7 +895,7 @@ const AllShipmentsPage = () => {
     try {
       // Get the consistent date from generation status or use provided date
       const generationStatus = croGenerationStatus[croFormData.shipmentId];
-      const formDate = generationStatus?.firstCroGenerationDate 
+      const formDate = generationStatus?.firstCroGenerationDate
         ? new Date(generationStatus.firstCroGenerationDate).toISOString().split('T')[0]
         : croFormData.date || new Date().toISOString().split('T')[0]; // Use provided date or fallback to current
 
@@ -827,16 +927,16 @@ const AllShipmentsPage = () => {
   const handleOpenBlModal = async (shipment: any, blType: BLType) => {
     setCurrentBlType(blType);
     setBlJustSaved(false); // Reset save flag initially
-    
+
     try {
       // ALWAYS fetch the latest shipment data first to get current container information
       const latestShipmentResponse = await axios.get(`http://localhost:8000/shipment/${shipment.id}`);
       const latestShipment = latestShipmentResponse.data;
-      
+
       // Try to fetch existing BL data for this shipment
       const response = await axios.get(`http://localhost:8000/bill-of-lading/shipment/${shipment.id}`);
       const existingBl = response.data;
-      
+
       if (existingBl) {
         // Update BL generation status
         setBlGenerationStatus(prev => ({
@@ -906,6 +1006,7 @@ const AllShipmentsPage = () => {
         });
         // Set the flag to true so download button is visible for existing BL
         setBlJustSaved(true);
+        await hydrateAssignmentsForModal(shipment.id, blType);
       } else {
         // Initialize BL generation status as not generated
         setBlGenerationStatus(prev => ({
@@ -967,15 +1068,16 @@ const AllShipmentsPage = () => {
         });
         // Keep blJustSaved as false for new forms
         setBlJustSaved(false);
+        await hydrateAssignmentsForModal(shipment.id, blType);
       }
     } catch (error) {
       console.log('No existing BL found, showing empty form with latest shipment data');
-      
+
       // Always fetch latest shipment data even in catch block
       try {
         const latestShipmentResponse = await axios.get(`http://localhost:8000/shipment/${shipment.id}`);
         const latestShipment = latestShipmentResponse.data;
-        
+
         // Show empty form with LATEST shipment data if no existing data or error occurred
         setBlFormData({
           shipmentId: shipment.id,
@@ -1024,6 +1126,25 @@ const AllShipmentsPage = () => {
             netWt: ''
           })) || []
         });
+
+        // Rehydrate saved BL groups from the server (persists across devices)
+        try {
+          const savedGroups = await fetchBlAssignments(shipment.id, blType as BLType);
+          if (savedGroups.length > 0) {
+            setBlCount(savedGroups.length);
+            setBlGroups(savedGroups);
+            setMultiBlStageReady(true);
+          } else {
+            setBlCount(1);
+            setBlGroups([]);
+            setMultiBlStageReady(false);
+          }
+        } catch {
+          setBlCount(1);
+          setBlGroups([]);
+          setMultiBlStageReady(false);
+        }
+
       } catch (shipmentError) {
         console.error('Error fetching latest shipment data:', shipmentError);
         // Fallback to original shipment data if latest fetch fails
@@ -1077,29 +1198,31 @@ const AllShipmentsPage = () => {
       }
       // Keep blJustSaved as false for new forms
       setBlJustSaved(false);
+      await hydrateAssignmentsForModal(shipment.id, blType);
+
     }
-    
+
     setShowBlModal(true);
   };
 
-  // Handle saving BL form data
+  // Handle saving BL form data (NO auto download here)
+  // Handle saving BL form data (NO auto download; CLOSE modal immediately)
   const handleSaveBlData = async () => {
     try {
-      // Check if BL already exists to determine if this is create or update
+      // Detect create vs update
       let isExistingBl = false;
       try {
-        const existingBlResponse = await axios.get(`http://localhost:8000/bill-of-lading/shipment/${blFormData.shipmentId}`);
+        const existingBlResponse = await axios.get(
+          `http://localhost:8000/bill-of-lading/shipment/${blFormData.shipmentId}`
+        );
         isExistingBl = !!existingBlResponse.data;
-      } catch (error) {
-        // If error, BL doesn't exist, so this is a create operation
+      } catch {
         isExistingBl = false;
       }
 
-      
-
-      // Create the payload without shipmentId for the new endpoint
+      // Build payload for backend
       const blPayload = {
-        date: blFormData.date, // Include the editable date
+        date: blFormData.date,
         shippersName: blFormData.shippersName,
         shippersAddress: blFormData.shippersAddress,
         shippersContactNo: blFormData.shippersContactNo,
@@ -1131,61 +1254,113 @@ const AllShipmentsPage = () => {
         portOfLoading: blFormData.portOfLoading,
         portOfDischarge: blFormData.portOfDischarge,
         vesselNo: blFormData.vesselNo,
-        // Charges and fees field
         chargesAndFees: blFormData.chargesAndFees,
       };
 
-      // Debug: Log the payload being sent to backend
-      console.log('Payload being sent to backend:', blPayload);
-
-      // Use the new generate endpoint that handles creation/update with generation tracking
-      const response = await axios.post(`http://localhost:8000/bill-of-lading/generate/${blFormData.shipmentId}`, blPayload);
+      // Create/Update on backend — no PDF generation here
+      const response = await axios.post(
+        `http://localhost:8000/bill-of-lading/generate/${blFormData.shipmentId}`,
+        blPayload
+      );
       const savedBl = response.data;
 
-      console.log('Bill of Lading saved/updated successfully:', savedBl);
-      
-      // Update BL generation status with the returned data
+      // Update flags so Download button appears if needed later
       setBlGenerationStatus(prev => ({
         ...prev,
         [blFormData.shipmentId]: {
           hasDraftBlGenerated: savedBl.hasDraftBlGenerated || true,
           hasOriginalBLGenerated: savedBl.hasOriginalBLGenerated || false,
-          firstGenerationDate: savedBl.firstGenerationDate || new Date().toISOString()
-        }
+          firstGenerationDate: savedBl.firstGenerationDate || new Date().toISOString(),
+        },
       }));
 
-      alert(`${currentBlType === 'original' ? 'Original' : currentBlType === 'draft' ? 'Draft' : 'Seaway'} Bill of Lading saved successfully!`);
-      setBlJustSaved(true); // Show download button and enable update mode
-      
-      // Only close the modal if this was an update (not a new creation)
-      if (isExistingBl) {
-        // Close the modal after a short delay to allow user to see the success message
-        setTimeout(() => {
-          setShowBlModal(false);
-        }, 1000);
-      }
-      // If it's a new creation, keep the modal open so user can continue editing
+      alert(
+        `${currentBlType === 'original'
+          ? 'Original'
+          : currentBlType === 'draft'
+            ? 'Draft'
+            : 'Seaway'
+        } Bill of Lading saved successfully!`
+      );
+      setBlJustSaved(true);
+
+      // Persist current group assignments locally (optional; your server save is elsewhere)
+      try {
+        const key = `blGroups:${blFormData.shipmentId}:${currentBlType}`;
+        if (blGroups && blGroups.length > 0) {
+          localStorage.setItem(key, JSON.stringify(blGroups));
+        }
+      } catch { }
+
+      // ✅ CLOSE THE MODAL IMMEDIATELY (no timeout)
+      setShowBlModal(false);
+
     } catch (error) {
       console.error('Error saving Bill of Lading:', error);
       alert('Error saving Bill of Lading. Please try again.');
     }
   };
 
-  // Handle editing shipment from BL modal
-  const handleEditShipmentFromBl = async () => {
+  const handleDownloadAssignedBl = async (shipmentId: number, blType: BLType, index: number) => {
     try {
-      // Find the current shipment data
-      const shipmentToEdit = shipments.find(s => s.id === blFormData.shipmentId);
-      if (shipmentToEdit) {
-        // Close BL modal first
-        setShowBlModal(false);
-        // Use existing handleEdit function to open edit form
-        await handleEdit(shipmentToEdit);
+      // get latest server-saved groups
+      const groups = await fetchBlAssignments(shipmentId, blType);
+      const selected = groups[index] || [];
+      if (!selected.length) {
+        alert(`No containers assigned for ${index + 1} BL.`);
+        return;
       }
-    } catch (error) {
-      console.error('Error opening edit form:', error);
+
+      // build an override limited to selected containers
+      const perBlOverride = {
+        ...blFormData,
+        containers: (blFormData?.containers || []).filter((c: any) =>
+          selected.includes(c?.containerNumber)
+        ),
+        containerNos: selected.join(', '),
+      };
+
+      const generationStatus = blGenerationStatus[shipmentId];
+      const consistentDate = generationStatus?.firstGenerationDate
+        ? new Date(generationStatus.firstGenerationDate).toISOString().split('T')[0]
+        : new Date().toISOString().split('T')[0];
+
+      const pdfData = {
+        shipmentId,
+        blType,
+        date: consistentDate,
+        blNumber: `${blType.toUpperCase()}-${Date.now()}-${index + 1}`,
+        shipper: blFormData.shippersName,
+        consignee: blFormData.consigneeName,
+        notifyParty: blFormData.notifyPartyName,
+        placeOfAcceptance: '',
+        portOfLoading: blFormData.portOfLoading,
+        portOfDischarge: blFormData.portOfDischarge,
+        placeOfDelivery: '',
+        vesselVoyageNo: blFormData.vesselNo,
+        containerInfo: '',
+        marksNumbers: '',
+        descriptionOfGoods: blFormData.billofLadingDetails,
+        grossWeight: blFormData.grossWt,
+        netWeight: blFormData.netWt,
+        shippingMarks: '',
+        freightCharges: blFormData.freightAmount,
+        freightPayableAt: blFormData.freightPayableAt,
+        numberOfOriginals: '',
+        placeOfIssue: '',
+        dateOfIssue: consistentDate,
+        containers: [],
+      };
+
+      await generateBlPdf(blType, pdfData as any, perBlOverride as any, 0);
+    } catch (e) {
+      console.error(e);
+      alert('Failed to download assigned BL.');
     }
   };
+
+
+
 
   // Handle downloading BL PDF with current form data
   const handleDownloadBlPdf = async () => {
@@ -1220,14 +1395,14 @@ const AllShipmentsPage = () => {
         dateOfIssue: formDate,
         containers: []
       };
-      
+
       await generateBlPdf(currentBlType, pdfData, blFormData, 0); // 0 = original copy
-      
+
       // If this is an original BL download and hasn't been generated before, mark it as generated
       if (currentBlType === 'original' && !blGenerationStatus[blFormData.shipmentId]?.hasOriginalBLGenerated) {
         try {
           await axios.post(`http://localhost:8000/bill-of-lading/mark-original-generated/${blFormData.shipmentId}`);
-          
+
           // Update the local state to reflect that original BL has been generated
           setBlGenerationStatus(prev => ({
             ...prev,
@@ -1241,7 +1416,7 @@ const AllShipmentsPage = () => {
           // Don't block the download process if this fails
         }
       }
-      
+
       // Mark original as downloaded in local state (for UI purposes)
       setBlCopyDownloadStatus(prev => ({
         ...prev,
@@ -1255,7 +1430,7 @@ const AllShipmentsPage = () => {
           }
         }
       }));
-      
+
       setShowBlModal(false);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1269,11 +1444,11 @@ const AllShipmentsPage = () => {
       // Fetch the latest shipment data to get current container information
       const latestShipmentResponse = await axios.get(`http://localhost:8000/shipment/${shipmentId}`);
       const latestShipment = latestShipmentResponse.data;
-      
+
       // Fetch the existing BL data for this shipment
       const existingBlResponse = await axios.get(`http://localhost:8000/bill-of-lading/shipment/${shipmentId}`);
       const existingBl = existingBlResponse.data;
-      
+
       if (!existingBl) {
         alert('Original BL data not found. Please generate the original BL first.');
         return;
@@ -1330,9 +1505,9 @@ const AllShipmentsPage = () => {
         dateOfIssue: formDate,
         containers: []
       };
-      
+
       await generateBlPdf(blType, pdfData, blDataWithCurrentContainers, 1); // 1 = 2nd copy
-      
+
       // Mark 2nd copy as downloaded
       setBlCopyDownloadStatus(prev => ({
         ...prev,
@@ -1344,7 +1519,7 @@ const AllShipmentsPage = () => {
           }
         }
       }));
-      
+
     } catch (error) {
       console.error('Error generating 2nd copy PDF:', error);
       alert('Error generating 2nd copy PDF. Please try again.');
@@ -1357,11 +1532,11 @@ const AllShipmentsPage = () => {
       // Fetch the latest shipment data to get current container information
       const latestShipmentResponse = await axios.get(`http://localhost:8000/shipment/${shipmentId}`);
       const latestShipment = latestShipmentResponse.data;
-      
+
       // Fetch the existing BL data for this shipment
       const existingBlResponse = await axios.get(`http://localhost:8000/bill-of-lading/shipment/${shipmentId}`);
       const existingBl = existingBlResponse.data;
-      
+
       if (!existingBl) {
         alert('Original BL data not found. Please generate the original BL first.');
         return;
@@ -1418,9 +1593,9 @@ const AllShipmentsPage = () => {
         dateOfIssue: formDate,
         containers: []
       };
-      
+
       await generateBlPdf(blType, pdfData, blDataWithCurrentContainers, 2); // 2 = 3rd copy
-      
+
       // Mark 3rd copy as downloaded
       setBlCopyDownloadStatus(prev => ({
         ...prev,
@@ -1432,7 +1607,7 @@ const AllShipmentsPage = () => {
           }
         }
       }));
-      
+
     } catch (error) {
       console.error('Error generating 3rd copy PDF:', error);
       alert('Error generating 3rd copy PDF. Please try again.');
@@ -1445,7 +1620,7 @@ const AllShipmentsPage = () => {
       // Fetch the existing BL data for this shipment
       const existingBlResponse = await axios.get(`http://localhost:8000/bill-of-lading/shipment/${shipmentId}`);
       const existingBl = existingBlResponse.data;
-      
+
       if (!existingBl) {
         alert(`${blType.charAt(0).toUpperCase() + blType.slice(1)} BL data not found. Please generate it first.`);
         return;
@@ -1485,7 +1660,7 @@ const AllShipmentsPage = () => {
         dateOfIssue: formDate,
         containers: []
       };
-      
+
       // Use LATEST container data with preserved BL-specific information
       const savedSealNumbers = existingBl.sealNo ? String(existingBl.sealNo).split(',').map((s: string) => s.trim()) : [];
       const savedGrossWeights = existingBl.grossWt ? String(existingBl.grossWt).split(',').map((s: string) => s.trim()) : [];
@@ -1507,9 +1682,9 @@ const AllShipmentsPage = () => {
         portOfDischarge: latestShipment.podPort?.portName || '', // Always use latest port
         containerNos: latestContainers.map((c: any) => c.containerNumber).join(', ') // Update container numbers
       };
-      
+
       await generateBlPdf(blType, pdfData, blDataWithCurrentContainers, 0); // 0 = original copy
-      
+
       // Update BL generation status for direct downloads so copy options appear
       if (blType === 'original') {
         setBlGenerationStatus(prev => ({
@@ -1521,7 +1696,7 @@ const AllShipmentsPage = () => {
           }
         }));
       }
-      
+
     } catch (error) {
       console.error('Error downloading BL PDF directly:', error);
       alert('Error downloading BL PDF. Please try again.');
@@ -1532,9 +1707,11 @@ const AllShipmentsPage = () => {
   const handleDirectCroDownload = async (shipmentId: number) => {
     try {
       // Fetch shipment data
-      const shipmentResponse = await axios.get(`http://localhost:8000/shipment/${shipmentId}`);
-      const shipment = shipmentResponse.data;
-      
+      const shipment = await apiFetch(
+        `http://localhost:8000/shipment/${shipmentId}`,
+        { method: 'GET' }
+      );
+
       if (!shipment.containers || shipment.containers.length === 0) {
         alert('No containers found for this shipment.');
         return;
@@ -1542,14 +1719,20 @@ const AllShipmentsPage = () => {
 
       // Use current date as we don't have a specific CRO date saved
       const currentDate = new Date().toISOString().split('T')[0];
-      
+
       await generateCroPdf(shipmentId, shipment.containers, currentDate);
-      
+
     } catch (error) {
       console.error('Error downloading CRO PDF directly:', error);
       alert('Error downloading CRO PDF. Please try again.');
     }
   };
+
+
+
+
+
+
 
   return (
     <div className="px-4 pt-4 pb-4 bg-white dark:bg-black min-h-screen">
@@ -1649,7 +1832,7 @@ const AllShipmentsPage = () => {
 
               // Vessel
               vesselName: '',
-              
+
               // Tank preparation
               tankPreparation: '',
             });
@@ -1688,7 +1871,7 @@ const AllShipmentsPage = () => {
             onEdit={() => {
               // Close view modal first
               setShowViewModal(false);
-              
+
               // Then trigger edit with a slight delay
               setTimeout(() => {
                 handleEdit(viewShipment);
@@ -1698,7 +1881,7 @@ const AllShipmentsPage = () => {
         )}
       </div>
 
-              <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-black overflow-x-auto shadow-sm">
+      <div className="rounded-lg border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-black overflow-x-auto shadow-sm">
         <Table>
           <TableHeader className="bg-neutral-100 dark:bg-neutral-900">
             <TableRow className="hover:bg-neutral-200/60 dark:hover:bg-neutral-800/60 border-neutral-200 dark:border-neutral-800">
@@ -1790,9 +1973,9 @@ const AllShipmentsPage = () => {
                             </span>
                             {croGenerationStatus[shipment.id]?.hasCroGenerated && (
                               <div className="ml-4 border-l border-gray-200 pl-3">
-                                <Download 
-                                  size={16} 
-                                  className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                <Download
+                                  size={16}
+                                  className="text-green-600 hover:text-green-700 cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDirectCroDownload(shipment.id);
@@ -1802,89 +1985,117 @@ const AllShipmentsPage = () => {
                               </div>
                             )}
                           </DropdownMenuItem>
-                          
+
+
+
+
+
                           {/* Draft BL Options */}
-                          <DropdownMenuItem className='cursor-pointer flex items-center justify-between py-2'>
-                            <span onClick={() => handleOpenBlModal(shipment, 'draft')} className="flex-1 hover:text-blue-600">
-                              Generate Draft BL
-                            </span>
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-center justify-between py-2"
+                            onClick={() => handleOpenBlModal(shipment, 'draft')}
+                          >
+                            <span className="flex-1 hover:text-blue-600">Generate Draft BL</span>
                             {blGenerationStatus[shipment.id]?.hasDraftBlGenerated && (
                               <div className="ml-4 border-l border-gray-200 pl-3">
-                                <Download 
-                                  size={16} 
-                                  className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                <Download
+                                  size={16}
+                                  className="text-green-600 hover:text-green-700 cursor-pointer"
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     handleDirectBlDownload(shipment.id, 'draft');
                                   }}
-
                                 />
                               </div>
                             )}
                           </DropdownMenuItem>
-                          
+
+                          {/* Assigned BL downloads — Draft */}
+                          <AssignedBlDownloads
+                            shipmentId={shipment.id}
+                            blType="draft"
+                            label="Draft"
+                            onClickDownload={(i) => handleDownloadAssignedBl(shipment.id, 'draft', i)}
+                          />
+
                           {/* Original and Seaway BL Options - only after draft has been generated */}
                           {blGenerationStatus[shipment.id]?.hasDraftBlGenerated && (
                             <>
-                              <DropdownMenuItem className='cursor-pointer flex items-center justify-between py-2'>
-                                <span onClick={() => handleOpenBlModal(shipment, 'original')} className="flex-1 hover:text-blue-600">
-                                  Generate Original BL
-                                </span>
+                              <DropdownMenuItem
+                                className="cursor-pointer flex items-center justify-between py-2"
+                                onClick={() => handleOpenBlModal(shipment, 'original')}
+                              >
+                                <span className="flex-1 hover:text-blue-600">Generate Original BL</span>
                                 {blGenerationStatus[shipment.id]?.hasOriginalBLGenerated && (
                                   <div className="ml-4 border-l border-gray-200 pl-3">
-                                    <Download 
-                                      size={16} 
-                                      className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                    <Download
+                                      size={16}
+                                      className="text-green-600 hover:text-green-700 cursor-pointer"
                                       onClick={(e) => {
                                         e.stopPropagation();
                                         handleDirectBlDownload(shipment.id, 'original');
                                       }}
-
                                     />
                                   </div>
                                 )}
                               </DropdownMenuItem>
-                              
-                              <DropdownMenuItem className='cursor-pointer flex items-center justify-between py-2'>
-                                <span onClick={() => handleOpenBlModal(shipment, 'seaway')} className="flex-1 hover:text-blue-600">
-                                  Generate Seaway BL
-                                </span>
+
+                              {/* Assigned BL downloads — Original */}
+                              <AssignedBlDownloads
+                                shipmentId={shipment.id}
+                                blType="original"
+                                label="Original"
+                                onClickDownload={(i) => handleDownloadAssignedBl(shipment.id, 'original', i)}
+                              />
+
+                              <DropdownMenuItem
+                                className="cursor-pointer flex items-center justify-between py-2"
+                                onClick={() => handleOpenBlModal(shipment, 'seaway')}
+                              >
+                                <span className="flex-1 hover:text-blue-600">Generate Seaway BL</span>
                                 {blGenerationStatus[shipment.id]?.hasDraftBlGenerated && (
                                   <div className="ml-4 border-l border-gray-200 pl-3">
-                                    <Download 
-                                      size={16} 
-                                      className="text-green-600 hover:text-green-700 cursor-pointer" 
+                                    <Download
+                                      size={16}
+                                      className="text-green-600 hover:text-green-700 cursor-pointer"
                                       onClick={(e) => {
                                         e.stopPropagation();  
                                         handleDirectBlDownload(shipment.id, 'seaway');
                                       }}
-
                                     />
                                   </div>
                                 )}
                               </DropdownMenuItem>
+
+                              {/* Assigned BL downloads — Seaway */}
+                              <AssignedBlDownloads
+                                shipmentId={shipment.id}
+                                blType="seaway"
+                                label="Seaway"
+                                onClickDownload={(i) => handleDownloadAssignedBl(shipment.id, 'seaway', i)}
+                              />
                             </>
                           )}
-                          
-                          {/* Copy download options - show only for Original BL type */}
-                          {/* Original BL Copy Options - only show for original BL */}
+
+                          {/* Original BL Copy Options */}
                           {blGenerationStatus[shipment.id]?.hasOriginalBLGenerated && (
                             <>
-                              <DropdownMenuItem 
-                                onClick={() => handleDownload2ndCopyBlPdf(shipment.id, 'original')} 
-                                className='cursor-pointer text-blue-600'
+                              <DropdownMenuItem
+                                onClick={() => handleDownload2ndCopyBlPdf(shipment.id, 'original')}
+                                className="cursor-pointer text-blue-600"
                               >
                                 Download Original BL 2nd Copy
                               </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={() => handleDownload3rdCopyBlPdf(shipment.id, 'original')} 
-                                className='cursor-pointer text-blue-600'
+                              <DropdownMenuItem
+                                onClick={() => handleDownload3rdCopyBlPdf(shipment.id, 'original')}
+                                className="cursor-pointer text-blue-600"
                               >
                                 Download Original BL 3rd Copy
                               </DropdownMenuItem>
                             </>
                           )}
                         </DropdownMenuContent>
+
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
@@ -1900,7 +2111,7 @@ const AllShipmentsPage = () => {
           <DialogHeader>
             <DialogTitle>Generate Container Release Order</DialogTitle>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
             {/* Document Information */}
             <div className="grid grid-cols-2 gap-4">
@@ -2136,10 +2347,10 @@ const AllShipmentsPage = () => {
 
       {/* BL Form Modal */}
       <Dialog open={showBlModal} onOpenChange={setShowBlModal}>
-        <DialogContent 
-          className="max-h-[90vh] overflow-y-auto !w-[600px] !max-w-[600px] bl-modal-content" 
-          style={{ 
-            width: '600px !important', 
+        <DialogContent
+          className="max-h-[90vh] overflow-y-auto !w-[600px] !max-w-[600px] bl-modal-content"
+          style={{
+            width: '600px !important',
             maxWidth: '600px !important',
             minWidth: '600px',
             '--radix-dialog-content-width': '600px',
@@ -2149,9 +2360,9 @@ const AllShipmentsPage = () => {
           <DialogHeader>
             <DialogTitle>Generate {currentBlType === 'original' ? 'Original' : currentBlType === 'draft' ? 'Draft' : 'Seaway'} Bill of Lading</DialogTitle>
           </DialogHeader>
-          
+
           <div className="grid gap-4 py-4">
-            
+
             {/* Date Field - Added at the top */}
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -2160,7 +2371,7 @@ const AllShipmentsPage = () => {
                   id="blDate"
                   type="date"
                   value={blFormData.date}
-                  onChange={(e) => setBlFormData({...blFormData, date: e.target.value})}
+                  onChange={(e) => setBlFormData({ ...blFormData, date: e.target.value })}
                   className="bg-white dark:bg-black"
                 />
               </div>
@@ -2173,18 +2384,185 @@ const AllShipmentsPage = () => {
                   className="bg-gray-100 cursor-not-allowed"
                 />
               </div>
-              {/* <div className="space-y-2">
-                <Label htmlFor="shipmentIdDisplay">Shipment ID</Label>
-                <Input
-                  id="shipmentIdDisplay"
-                  value={blFormData.shipmentId.toString()}
-                  disabled
-                  className="bg-gray-100 cursor-not-allowed"
-                />
-              </div> */}
+
+              {/* === MULTI BL (full width below Issued Date) === */}
+              <div className="col-span-full mt-6 space-y-4">
+                {/* Top row: Count + Set on the left, Save on the right */}
+                <div className="flex flex-wrap items-end justify-between gap-3">
+                  <div>
+                    <Label className="mb-1 block">
+                      No. of BL (Don’t alter if you want single BL containing all containers)
+                    </Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="number"
+                        min={1}
+                        value={blCount}
+                        onChange={(e) =>
+                          setBlCount(Math.max(1, Number(e.target.value || 1)))
+                        }
+                        className="w-28 bg-white dark:bg-black"
+                      />
+
+                      {/* Set: open groups UI (Download will auto-hide because of derived flag) */}
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          initBlGroups(blCount);        // shows the assignment cards
+                          // no state needed for blocking; derived flag will become true when groups > 1
+                        }}
+                        className="cursor-pointer"
+                      >
+                        Set
+                      </Button>
+
+                      {/* Reset: clear groups UI (Download re-appears automatically) */}
+                      {multiBlStageReady && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setBlGroups([]);            // no groups
+                            setMultiBlStageReady(false);// assignment cards hidden
+                            setBlCount(1);              // back to single BL mode
+                            // downloadBlockedByAssign becomes false automatically
+                          }}
+                          className="cursor-pointer"
+                        >
+                          Reset
+                        </Button>
+                      )}
+                    </div>
+
+
+                    <p className="text-xs text-gray-500 mt-2">
+                      Click “Set” to open BL groups. Assign each container to exactly one BL.
+                    </p>
+                  </div>
+
+                  {multiBlStageReady && (
+                    <Button
+                      type="button"
+                      onClick={async () => {
+                        if (!blFormData?.shipmentId) return;
+
+                        // ✅ Require at least one container in each BL
+                        if (blGroups.some((grp) => grp.length === 0)) {
+                          alert("Each BL must have at least one container assigned.");
+                          return;
+                        }
+                        await saveBlAssignments(
+                          blFormData.shipmentId,
+                          currentBlType as BLType,
+                          blGroups
+                        );
+
+
+
+
+                        await saveBlAssignments(
+                          blFormData.shipmentId,
+                          currentBlType as BLType,
+                          blGroups
+                        );
+
+                        await hydrateAssignmentsForModal(blFormData.shipmentId, currentBlType as BLType);
+
+
+
+
+                        alert(`Saved container assignments for ${blGroups.length} BL(s). Now click "Update Bill of Lading".`);
+                      }}
+                      className="cursor-pointer"
+                    >
+                      Save Assignments
+                    </Button>
+                  )}
+
+                </div>
+
+                {/* Cards: one per BL, neatly filling the width under the date */}
+                {multiBlStageReady && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    {blGroups.map((grp, idx) => {
+                      const allContainers = getAllContainersFromForm();
+
+                      // Build map: containerNumber -> groupIndex
+                      const assignedMap = blGroups.reduce<Record<string, number>>(
+                        (acc, g, gIdx) => {
+                          g.forEach((cn) => {
+                            acc[cn] = gIdx;
+                          });
+                          return acc;
+                        },
+                        {}
+                      );
+
+                      const ord = (n: number) =>
+                        n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : `${n}th`;
+
+                      return (
+                        <div
+                          key={idx}
+                          className="border rounded-md p-3 bg-gray-50 dark:bg-zinc-900"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">Containers in {ord(idx + 1)} BL</div>
+                            <div className="text-xs text-gray-500">
+                              Selected: {grp.length}/{allContainers.length}
+                            </div>
+                          </div>
+
+                          <ul className="space-y-2">
+                            {allContainers.map((cn) => {
+                              const assignedTo = assignedMap[cn];
+                              const isChecked = grp.includes(cn);
+                              const isDisabled =
+                                assignedTo !== undefined && assignedTo !== idx;
+
+                              return (
+                                <li key={cn}>
+                                  <label
+                                    className={`inline-flex items-center gap-2 border px-2 py-1 rounded ${isDisabled
+                                        ? "opacity-60 cursor-not-allowed"
+                                        : "cursor-pointer"
+                                      }`}
+                                    title={
+                                      isDisabled
+                                        ? `Already assigned to ${ord((assignedTo ?? 0) + 1)} BL`
+                                        : ""
+                                    }
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={isChecked}
+                                      disabled={isDisabled}
+                                      onChange={() => toggleContainerInGroup(idx, cn)}
+                                    />
+                                    <span className="text-sm">{cn}</span>
+                                    {isDisabled && (
+                                      <span className="text-[10px] ml-1 px-1.5 py-0.5 rounded bg-neutral-200 dark:bg-neutral-800">
+                                        {ord((assignedTo ?? 0) + 1)}
+                                      </span>
+                                    )}
+                                  </label>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+              {/* === END MULTI BL === */}
+
+
             </div>
             {/* Shipper Information */}
-            <hr className="dark:border-black  "/>
+            <hr className="dark:border-black  " />
             <div className="mt-4">
               <h3 className="text-lg font-semibold mb-3">Shipper Section</h3>
               <div className="space-y-2">
@@ -2192,7 +2570,7 @@ const AllShipmentsPage = () => {
                 <Textarea
                   id="shipperInfo"
                   value={blFormData.shipperInfo}
-                  onChange={(e) => setBlFormData({...blFormData, shipperInfo: e.target.value})}
+                  onChange={(e) => setBlFormData({ ...blFormData, shipperInfo: e.target.value })}
                   placeholder="Enter all shipper information here. You can copy and paste from existing sources."
                   className="bg-white dark:bg-black min-h-[120px] resize-vertical"
                   rows={6}
@@ -2209,7 +2587,7 @@ const AllShipmentsPage = () => {
                 <Textarea
                   id="consigneeInfo"
                   value={blFormData.consigneeInfo}
-                  onChange={(e) => setBlFormData({...blFormData, consigneeInfo: e.target.value})}
+                  onChange={(e) => setBlFormData({ ...blFormData, consigneeInfo: e.target.value })}
                   placeholder="Enter all consignee information here. You can copy and paste from existing sources."
                   className="bg-white dark:bg-black min-h-[120px] resize-vertical"
                   rows={6}
@@ -2226,7 +2604,7 @@ const AllShipmentsPage = () => {
                 <Textarea
                   id="notifyPartyInfo"
                   value={blFormData.notifyPartyInfo}
-                  onChange={(e) => setBlFormData({...blFormData, notifyPartyInfo: e.target.value})}
+                  onChange={(e) => setBlFormData({ ...blFormData, notifyPartyInfo: e.target.value })}
                   placeholder="Enter all notify party information here. You can copy and paste from existing sources."
                   className="bg-white dark:bg-black min-h-[120px] resize-vertical"
                   rows={6}
@@ -2243,7 +2621,7 @@ const AllShipmentsPage = () => {
                 <Textarea
                   id="deliveryAgentInfo"
                   value={blFormData.deliveryAgentInfo}
-                  onChange={(e) => setBlFormData({...blFormData, deliveryAgentInfo: e.target.value})}
+                  onChange={(e) => setBlFormData({ ...blFormData, deliveryAgentInfo: e.target.value })}
                   placeholder="Enter all delivery agent information here. You can copy and paste from existing sources."
                   className="bg-white dark:bg-black min-h-[120px] resize-vertical"
                   rows={6}
@@ -2262,10 +2640,10 @@ const AllShipmentsPage = () => {
                   <Input
                     id="portOfLoading"
                     value={blFormData.portOfLoading}
-                    onChange={(e) => setBlFormData({...blFormData, portOfLoading: e.target.value})}
+                    onChange={(e) => setBlFormData({ ...blFormData, portOfLoading: e.target.value })}
                     placeholder="Port of loading"
                     className="bg-white dark:bg-black"
-                    readOnly  
+                    readOnly
                   />
                 </div>
                 <div className="space-y-2">
@@ -2273,7 +2651,7 @@ const AllShipmentsPage = () => {
                   <Input
                     id="portOfDischarge"
                     value={blFormData.portOfDischarge}
-                    onChange={(e) => setBlFormData({...blFormData, portOfDischarge: e.target.value})}
+                    onChange={(e) => setBlFormData({ ...blFormData, portOfDischarge: e.target.value })}
                     placeholder="Port of discharge"
                     className="bg-white dark:bg-black"
                     readOnly
@@ -2284,7 +2662,7 @@ const AllShipmentsPage = () => {
                   <Input
                     id="vesselNo"
                     value={blFormData.vesselNo}
-                    onChange={(e) => setBlFormData({...blFormData, vesselNo: e.target.value})}
+                    onChange={(e) => setBlFormData({ ...blFormData, vesselNo: e.target.value })}
                     placeholder="Vessel number"
                     className="bg-white dark:bg-black"
                     readOnly
@@ -2312,7 +2690,7 @@ const AllShipmentsPage = () => {
                           const updatedContainers = [...blFormData.containers];
                           updatedContainers[index].containerNumber = e.target.value;
                           setBlFormData({
-                            ...blFormData, 
+                            ...blFormData,
                             containers: updatedContainers,
                             containerNos: updatedContainers.map(c => c.containerNumber).join(', ')
                           });
@@ -2333,7 +2711,7 @@ const AllShipmentsPage = () => {
                           const updatedContainers = [...blFormData.containers];
                           updatedContainers[index].grossWt = e.target.value;
                           setBlFormData({
-                            ...blFormData, 
+                            ...blFormData,
                             containers: updatedContainers,
                             grossWt: updatedContainers.map(c => c.grossWt || '').join(', ')
                           });
@@ -2353,7 +2731,7 @@ const AllShipmentsPage = () => {
                           const updatedContainers = [...blFormData.containers];
                           updatedContainers[index].netWt = e.target.value;
                           setBlFormData({
-                            ...blFormData, 
+                            ...blFormData,
                             containers: updatedContainers,
                             netWt: updatedContainers.map(c => c.netWt || '').join(', ')
                           });
@@ -2373,7 +2751,7 @@ const AllShipmentsPage = () => {
                           const updatedContainers = [...blFormData.containers];
                           updatedContainers[index].sealNumber = e.target.value;
                           setBlFormData({
-                            ...blFormData, 
+                            ...blFormData,
                             containers: updatedContainers,
                             sealNo: updatedContainers.map(c => c.sealNumber || '').join(', ')
                           });
@@ -2391,7 +2769,7 @@ const AllShipmentsPage = () => {
                   <Textarea
                     id="billofLadingDetails"
                     value={blFormData.billofLadingDetails}
-                    onChange={(e) => setBlFormData({...blFormData, billofLadingDetails: e.target.value})}
+                    onChange={(e) => setBlFormData({ ...blFormData, billofLadingDetails: e.target.value })}
                     placeholder="Enter bill of lading details (multiple lines supported)"
                     className="bg-white dark:bg-black min-h-[100px] resize-vertical"
                     rows={4}
@@ -2409,7 +2787,7 @@ const AllShipmentsPage = () => {
                   <Label htmlFor="freightPayableAt">Freight Payable At</Label>
                   <Select
                     value={blFormData.freightPayableAt}
-                    onValueChange={(value) => setBlFormData({...blFormData, freightPayableAt: value})}
+                    onValueChange={(value) => setBlFormData({ ...blFormData, freightPayableAt: value })}
                   >
                     <SelectTrigger className="w-full bg-white dark:bg-black">
                       <SelectValue placeholder="Select freight payable option" />
@@ -2433,7 +2811,7 @@ const AllShipmentsPage = () => {
               </div>
 
               {/* Charges Section */}
-               <hr className="dark:border-black mt-4"/>
+              <hr className="dark:border-black mt-4" />
               <div className="mt-4">
                 <h3 className="text-lg font-semibold">Charges and Fees Section</h3>
                 <div className="space-y-2 mt-4">
@@ -2441,7 +2819,7 @@ const AllShipmentsPage = () => {
                   <Textarea
                     id="chargesAndFees"
                     value={blFormData.chargesAndFees}
-                    onChange={(e) => setBlFormData({...blFormData, chargesAndFees: e.target.value})}
+                    onChange={(e) => setBlFormData({ ...blFormData, chargesAndFees: e.target.value })}
                     placeholder="Enter all charges and fees information here. You can copy and paste from existing sources."
                     className="bg-white dark:bg-black min-h-32"
                     rows={8}
@@ -2452,24 +2830,43 @@ const AllShipmentsPage = () => {
           </div>
 
           <DialogFooter className="space-x-2">
-            <Button variant="outline" onClick={() => setShowBlModal(false)} className='cursor-pointer'>
+            <Button
+              variant="outline"
+              onClick={() => setShowBlModal(false)}
+              className="cursor-pointer"
+            >
               Cancel
             </Button>
+
             {!blJustSaved ? (
-              <Button onClick={handleSaveBlData} className='cursor-pointer'>
+              <Button onClick={handleSaveBlData} className="cursor-pointer">
                 Save Bill of Lading
               </Button>
             ) : (
               <>
-                <Button onClick={handleSaveBlData} variant="outline" className='cursor-pointer'>
+                <Button
+                  onClick={handleSaveBlData}
+                  variant="outline"
+                  className="cursor-pointer"
+                >
                   Update Bill of Lading
                 </Button>
-                <Button onClick={handleDownloadBlPdf} className='cursor-pointer bg-green-600 hover:bg-green-700'>
-                  Download PDF
-                </Button>
+                {!downloadBlockedByAssign && (
+                  <Button
+                    onClick={handleDownloadBlPdf}
+                    className="cursor-pointer bg-green-600 hover:bg-green-700"
+                    title="Download PDF"
+                  >
+                    Download PDF
+                  </Button>
+                )}
+
               </>
             )}
           </DialogFooter>
+
+
+
         </DialogContent>
       </Dialog>
     </div>

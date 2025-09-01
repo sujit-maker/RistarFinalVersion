@@ -2947,6 +2947,7 @@ const AddShipmentModal = ({
                       placeholder=""
                       className="w-full p-2.5 bg-white dark:bg-neutral-800 text-gray-900 dark:text-white rounded border border-neutral-200 dark:border-neutral-700"
                     />
+                    
                   </div>
                   <div>
                     <Label
