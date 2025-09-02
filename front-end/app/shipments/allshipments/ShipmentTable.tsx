@@ -60,6 +60,10 @@ const AllShipmentsPage = () => {
   const [containerSearch, setContainerSearch] = useState('');
   const [blGroups, setBlGroups] = useState<string[][]>([]);
 
+// --- helpers (place near getAllContainersFromForm / above Multi BL UI) ---
+const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
+
+
 
   // Add state for selected containers
   const [selectedContainers, setSelectedContainers] = useState<any[]>([]);
@@ -147,6 +151,9 @@ const AllShipmentsPage = () => {
     // Add date field for BL generation
     date: '' // Will be set only if user fills it or uses existing date
   });
+
+
+
 
   // Add state for allMovements
   const [allMovements, setAllMovements] = useState<any[]>([]);
@@ -243,10 +250,11 @@ const AllShipmentsPage = () => {
 
 
 
-
   // has the “groups” UI been initialized?
   const [multiBlStageReady, setMultiBlStageReady] = React.useState(false);
   const downloadBlockedByAssign = multiBlStageReady && blGroups.length > 1;
+  
+
 
   function AssignedBlDownloads({
     shipmentId,
@@ -328,29 +336,42 @@ const AllShipmentsPage = () => {
     );
   };
 
-  // read all container numbers visible in this form (deduped)
-  const getAllContainersFromForm = (): string[] => {
-    const fromArray = (blFormData?.containers || [])
-      .map((c: any) => c?.containerNumber)
-      .filter(Boolean);
-    const fromString = (Array.isArray(blFormData?.containerNos)
-      ? blFormData.containerNos
-      : (blFormData?.containerNos || ''))
-      .toString()
-      .split(',')
-      .map((s: string) => s.trim())
-      .filter(Boolean);
-    return Array.from(new Set([...fromArray, ...fromString]));
-  };
+  
 
+
+  // read all container numbers visible in this form (deduped)
+const getAllContainersFromForm = (): string[] => {
+  const fromArray = (blFormData?.containers || [])
+    .map((c: any) => c?.containerNumber)
+    .filter(Boolean);
+  const fromString = (Array.isArray(blFormData?.containerNos)
+    ? blFormData.containerNos
+    : (blFormData?.containerNos || ''))
+    .toString()
+    .split(',')
+    .map((s: string) => s.trim())
+    .filter(Boolean);
+  return Array.from(new Set([...fromArray, ...fromString]));
+};
+
+    // Total containers available for this shipment (deduped)
+const totalContainers = React.useMemo(
+  () => getAllContainersFromForm().length,
+  // if getAllContainersFromForm has no deps, you can also depend on blFormData
+  // but the function itself already reads blFormData safely
+  [blFormData]
+);
   // init N groups; preserve any existing picks if count changes
-  const initBlGroups = (count: number) => {
-    setBlGroups(prev => {
-      const next = Array.from({ length: count }, (_, i) => (prev[i] ? [...prev[i]] : []));
-      return next.map(g => Array.from(new Set(g)));
-    });
-    setMultiBlStageReady(true);
-  };
+  // init N groups; preserve any existing picks if count changes
+const initBlGroups = (count: number) => {
+  const safeCount = clamp(count, 1, Math.max(1, totalContainers));  // <- enforce cap here too
+  setBlGroups(prev => {
+    const next = Array.from({ length: safeCount }, (_, i) => (prev[i] ? [...prev[i]] : []));
+    return next.map(g => Array.from(new Set(g)));
+  });
+  setMultiBlStageReady(true);
+};
+
 
   // toggle container in a group and ensure container exists in only ONE group
   const toggleContainerInGroup = (groupIdx: number, containerNumber: string) => {
@@ -2395,27 +2416,40 @@ const AllShipmentsPage = () => {
                     </Label>
                     <div className="flex gap-2">
                       <Input
-                        type="number"
-                        min={1}
-                        value={blCount}
-                        onChange={(e) =>
-                          setBlCount(Math.max(1, Number(e.target.value || 1)))
-                        }
-                        className="w-28 bg-white dark:bg-black"
-                      />
+  type="number"
+  min={1}
+  max={Math.max(1, totalContainers)}     // <- hard cap to container count
+  value={blCount}
+  onChange={(e) => {
+    const raw = Number(e.target.value || 1);
+    // clamp to [1, totalContainers]
+    setBlCount(clamp(raw, 1, Math.max(1, totalContainers)));
+  }}
+  className="w-28 bg-white dark:bg-black"
+/>
+
 
                       {/* Set: open groups UI (Download will auto-hide because of derived flag) */}
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => {
-                          initBlGroups(blCount);        // shows the assignment cards
-                          // no state needed for blocking; derived flag will become true when groups > 1
-                        }}
-                        className="cursor-pointer"
-                      >
-                        Set
-                      </Button>
+                     <Button
+  type="button"
+  variant="secondary"
+  onClick={() => {
+    // guard: never allow more BLs than containers
+    if (totalContainers <= 0) {
+      alert('No containers available to assign.');
+      return;
+    }
+    const safeCount = clamp(blCount, 1, totalContainers);
+    if (safeCount !== blCount) {
+      setBlCount(safeCount);
+      alert(`You can create at most ${totalContainers} BL(s) based on container count.`);
+    }
+    initBlGroups(safeCount);  // will open groups with the safe count
+  }}
+  className="cursor-pointer"
+>
+  Set
+</Button>
 
                       {/* Reset: clear groups UI (Download re-appears automatically) */}
                       {multiBlStageReady && (

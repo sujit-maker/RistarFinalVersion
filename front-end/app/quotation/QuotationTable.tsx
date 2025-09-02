@@ -393,13 +393,13 @@ const QuotationPage = () => {
 
       </div>
 
-      <div className="rounded-lg shadow border border-neutral-800 bg-neutral-900 overflow-x-auto">
+      <div className="rounded-lg shadow border bg-white dark:bg-neutral-900 border-neutral-200 dark:border-neutral-800 overflow-x-auto">
         <Table>
           <TableHeader className="bg-white dark:bg-neutral-900">
             <TableRow>
               {[
                 'Quote Ref.',
-                'createdAt',
+                'CreatedAt',
                 'Effective',
                 'Valid Till',
                 'Customer',
@@ -407,7 +407,6 @@ const QuotationPage = () => {
                 'Rate Type',
                 'POL',
                 'POD',
-                'Sales',
                 'Status',
                 'Actions',
               ].map((heading, i) => (

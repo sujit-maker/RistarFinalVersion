@@ -497,7 +497,7 @@ const AddInventoryForm: React.FC<InventoryFormProps> = ({
         const data = await response.json();
         const depotTerminals = data.filter((entry: any) =>
           entry.businessType &&
-          (entry.businessType.toLowerCase().includes("deport terminal") ||
+          (entry.businessType.toLowerCase().includes("depot terminal") ||
             entry.businessType.toLowerCase().includes("depot terminal") ||
             entry.businessType.toLowerCase().includes("depot-terminal"))
         );
@@ -567,7 +567,7 @@ const AddInventoryForm: React.FC<InventoryFormProps> = ({
 
     setFilteredDepotsByPort(filteredDepots.map(depot => ({
       ...depot,
-      businessType: "Deport Terminal" // Add the required businessType property
+      businessType: "Depot Terminal" // Add the required businessType property
     })));
 
     // If there are no depots for this port, show a message
@@ -1484,7 +1484,7 @@ const AddInventoryForm: React.FC<InventoryFormProps> = ({
               </select>
               {formData.onHireLocation && hireDepotOptions.length === 0 && (
                 <p className="mt-1 text-xs text-amber-500">
-                  No companies with business type "Deport Terminal" found for this port.
+                  No companies with business type "Depot Terminal" found for this port.
                   Please add one in Address Book first.
                 </p>
               )}

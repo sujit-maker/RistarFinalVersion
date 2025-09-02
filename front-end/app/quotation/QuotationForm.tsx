@@ -1398,7 +1398,7 @@ const AddQuotationModal = ({
             {/* Exp. Depot Name */}
             <div>
               <Label htmlFor="expDepotId" className="block text-sm text-gray-900 dark:text-white mb-1">
-                Exp. Depot Name
+                Exp. Depot Name <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value) => {
                 const selectedId = Number(value);
@@ -1427,7 +1427,7 @@ const AddQuotationModal = ({
             {/* Empty Return Depot */}
             <div>
               <Label htmlFor="emptyReturnDepot" className="block text-sm text-gray-900 dark:text-white mb-1">
-                Empty Return Depot
+                Empty Return Depot <span className="text-red-500">*</span>
               </Label>
 
               <Select onValueChange={(value) => {
@@ -1457,7 +1457,7 @@ const AddQuotationModal = ({
             {/* Exp. H. Agent Name */}
             <div>
               <Label htmlFor="expHAgentId" className="block text-sm text-gray-900 dark:text-white mb-1">
-                Exp. H. Agent Name
+                Exp. H. Agent Name <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value) => {
                 const selectedId = Number(value);
@@ -1486,7 +1486,7 @@ const AddQuotationModal = ({
             {/* Imp. H. Agent Name */}
             <div>
               <Label htmlFor="impHAgentId" className="block text-sm text-gray-900 dark:text-white mb-1">
-                Imp. H. Agent Name
+                Imp. H. Agent Name <span className="text-red-500">*</span>
               </Label>
               <Select onValueChange={(value) => {
                 const selectedId = Number(value);
